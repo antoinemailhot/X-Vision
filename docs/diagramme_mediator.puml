@@ -1,0 +1,55 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON MEDIATOR
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Coordination des opérations de Copier/Coller
+'               des paramètres d’affichage via un médiateur.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Mediator (Copier/Coller)
+
+interface Mediator {
+    +copier(source : Perspective) : void
+    +coller(cible : Perspective) : void
+}
+
+class MediatorCopie implements Mediator {
+    -gestionnaireCopie : GestionnaireCopie
+    -dernierParametres : ParametresAffichage
+    +copier(source : Perspective) : void
+    +coller(cible : Perspective) : void
+}
+
+class GestionnaireCopie {
+    -strategie : StrategieCopie
+    +definirStrategie(s : StrategieCopie) : void
+    +executerCopie(p : Perspective) : ParametresAffichage
+    +executerColler(p : Perspective, param : ParametresAffichage) : void
+}
+
+class Perspective {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+}
+
+class ParametresAffichage {
+    +zoom : double
+    +x : double
+    +y : double
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+MediatorCopie --> GestionnaireCopie : utilise
+MediatorCopie --> ParametresAffichage : stocke dernier
+MediatorCopie --> Perspective : agit sur
+GestionnaireCopie --> StrategieCopie
+StrategieCopie <|.. CopieEchelle
+StrategieCopie <|.. CopieTranslation
+StrategieCopie <|.. CopieComplete
+StrategieCopie <|.. CopieVide
+
+@enduml

@@ -1,0 +1,67 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON STRATEGY
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Implémentation du patron Strategy pour
+'               le copier/coller des paramètres d’affichage.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Strategy (Copier/Coller des paramètres)
+
+interface StrategieCopie {
+    +copier(p : Perspective) : ParametresAffichage
+    +coller(p : Perspective, param : ParametresAffichage) : void
+}
+
+class CopieEchelle implements StrategieCopie {
+    +copier(p : Perspective) : ParametresAffichage
+    +coller(p : Perspective, param : ParametresAffichage) : void
+}
+
+class CopieTranslation implements StrategieCopie {
+    +copier(p : Perspective) : ParametresAffichage
+    +coller(p : Perspective, param : ParametresAffichage) : void
+}
+
+class CopieComplete implements StrategieCopie {
+    +copier(p : Perspective) : ParametresAffichage
+    +coller(p : Perspective, param : ParametresAffichage) : void
+}
+
+class CopieVide implements StrategieCopie {
+    +copier(p : Perspective) : ParametresAffichage
+    +coller(p : Perspective, param : ParametresAffichage) : void
+}
+
+class GestionnaireCopie {
+    -strategie : StrategieCopie
+    +definirStrategie(s : StrategieCopie) : void
+    +executerCopie(p : Perspective) : ParametresAffichage
+    +executerColler(p : Perspective, param : ParametresAffichage) : void
+}
+
+class Perspective {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+}
+
+class ParametresAffichage {
+    +zoom : double
+    +x : double
+    +y : double
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+GestionnaireCopie --> StrategieCopie : utilise
+StrategieCopie <|.. CopieEchelle
+StrategieCopie <|.. CopieTranslation
+StrategieCopie <|.. CopieComplete
+StrategieCopie <|.. CopieVide
+GestionnaireCopie --> Perspective
+GestionnaireCopie --> ParametresAffichage
+
+@enduml

@@ -1,0 +1,142 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES PRINCIPAL - ARCHITECTURE MVC
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Représente l'architecture complète
+'               Modèle / Vue / Contrôleur (MVC)
+' =====================================================
+
+title X-Vision - Diagramme de classes principal (MVC)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam classFontSize 14
+skinparam packageTitleFontSize 16
+
+' ========================
+' === PAQUET MODELE ===
+' ========================
+package "Modèle" {
+    class Image {
+        - chemin : String
+        - largeur : int
+        - hauteur : int
+        - donneesPixels : byte[] 
+        + chargerImage(source : String) : void
+        + getDimension() : Dimension
+    }
+
+    class Perspective {
+        - facteurEchelle : double
+        - positionX : double
+        - positionY : double
+        + appliquerZoom(facteur : double) : void
+        + appliquerTranslation(dx : double, dy : double) : void
+    }
+
+    class GestionnaireDePerspectives {
+        - perspectives : List<Perspective>
+        + ajouterPerspective(p : Perspective) : void
+        + getPerspective(id : int) : Perspective
+        + sauvegarderToutes() : void
+    }
+
+    class Sujet {
+        - observateurs : List<Observateur>
+        + attacher(o : Observateur) : void
+        + detacher(o : Observateur) : void
+        + notifier() : void
+    }
+
+    class Observateur {
+        <<interface>>
+        + mettreAJour() : void
+    }
+
+    Image <|-- Sujet
+    Perspective -up-|> Sujet
+    Sujet "1" o-- "*" Observateur : notifie >
+    GestionnaireDePerspectives "1" *-- "*" Perspective
+}
+
+' ======================
+' === PAQUET VUE ===
+' ======================
+package "Vue" {
+    class VueAbstraite {
+        <<abstract>>
+        # modele : Sujet
+        + rafraichir() : void
+    }
+
+    class Vignette {
+        + afficherMiniature() : void
+    }
+
+    class VuePerspective {
+        + afficher() : void
+        + appliquerMiseAJour() : void
+    }
+
+    VueAbstraite <|-- Vignette
+    VueAbstraite <|-- VuePerspective
+    VueAbstraite ..|> Observateur
+}
+
+' ======================
+' === PAQUET CONTROLEUR ===
+' ======================
+package "Contrôleur" {
+    class ControleurAbstrait {
+        <<abstract>>
+        # modele : Sujet
+        + executerCommande() : void
+    }
+
+    class SourisControleur {
+        + gererClic() : void
+        + gererDeplacement() : void
+    }
+
+    class MenuControleur {
+        + gererSelection() : void
+    }
+
+    ControleurAbstrait <|-- SourisControleur
+    ControleurAbstrait <|-- MenuControleur
+}
+
+' ======================
+' === RELATIONS MVC ===
+' ======================
+VueAbstraite --> Sujet : observe >
+ControleurAbstrait --> Sujet : modifie >
+VueAbstraite --> ControleurAbstrait : utilise >
+GestionnaireDePerspectives --> Image : référence >
+
+' ======================
+' === SINGLETONS ET AUTRES ===
+' ======================
+class GestionnaireCommandes {
+    <<Singleton>>
+    - historique : Stack<Commande>
+    + getInstance() : GestionnaireCommandes
+    + executerCommande(cmd : Commande) : void
+}
+
+class Commande {
+    <<abstract>>
+    + executer() : void
+    + annuler() : void
+}
+
+class CommandeZoom
+class CommandeTranslation
+
+Commande <|-- CommandeZoom
+Commande <|-- CommandeTranslation
+GestionnaireCommandes "1" *-- "*" Commande
+
+@enduml

@@ -1,0 +1,65 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE SÉQUENCE - ANNULATION D’UNE COMMANDE
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Représente le processus d’annulation (Undo)
+'               d’une commande exécutée (ex : Zoom)
+' =====================================================
+
+title X-Vision - Diagramme de séquence : Annulation d’une commande (Undo)
+
+actor Utilisateur as U
+participant "VuePrincipale" as V
+participant "MenuControleur" as C
+participant "GestionnaireCommandes (Singleton)" as G
+participant "CommandeZoom" as Z
+participant "Memento" as M
+participant "Perspective (Modèle)" as P
+
+' =====================================================
+' SCÉNARIO : L’utilisateur demande un Undo
+' =====================================================
+
+U -> V : cliquer sur "Annuler (Undo)"
+V -> C : notifierActionUtilisateur("undo")
+C -> G : annulerDerniereCommande()
+
+' --- Vérification historique ---
+activate G
+G -> G : commande = historique.pop()
+alt commande existe
+    G -> Z : annuler()
+    activate Z
+
+    ' --- Restauration via Memento ---
+    Z -> M : obtenirEtatPrecedent()
+    activate M
+    M -> P : restaurerEtat(etatSauvegarde)
+    activate P
+    P -> P : appliquerParametresSauvegardes()
+    P --> M : restauration terminée
+    deactivate P
+    deactivate M
+
+    ' --- Notification des vues abonnées ---
+    Z -> P : notifier()
+    P -> V : mettreAJour()
+    V -> V : rafraichirAffichage()
+    V --> P : affichage restauré
+
+    deactivate Z
+else
+    G -> V : afficherMessage("Aucune commande à annuler.")
+end
+deactivate G
+
+' =====================================================
+' LÉGENDE :
+'  - GestionnaireCommandes : centralise les historiques de commandes
+'  - CommandeZoom : contient le lien vers un Memento (état précédent)
+'  - Memento : capture et restaure l’état d’un objet (ici Perspective)
+'  - Perspective : modèle dont l’état est restauré
+' =====================================================
+
+@enduml

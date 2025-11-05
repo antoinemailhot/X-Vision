@@ -1,0 +1,45 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON MEMENTO
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Implémentation du patron Memento pour
+'               gérer Undo/Redo des perspectives.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Memento (Undo / Redo)
+
+class Perspective {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+    +creerMemento() : MementoPerspective
+    +restaurer(m : MementoPerspective) : void
+}
+
+class MementoPerspective {
+    -etatZoom : double
+    -etatX : double
+    -etatY : double
+    +MementoPerspective(zoom : double, x : double, y : double)
+    +getZoom() : double
+    +getX() : double
+    +getY() : double
+}
+
+class Historique {
+    -pileUndo : Stack<MementoPerspective>
+    -pileRedo : Stack<MementoPerspective>
+    +sauvegarderEtat(m : MementoPerspective) : void
+    +annuler(p : Perspective) : void
+    +refaire(p : Perspective) : void
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+Perspective --> MementoPerspective : crée / restaure
+Historique --> MementoPerspective : stocke
+Historique --> Perspective : modifie
+
+@enduml

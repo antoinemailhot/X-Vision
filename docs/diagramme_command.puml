@@ -1,0 +1,63 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON COMMAND
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Implémentation du patron Command pour les
+'               opérations de Zoom et de Translation.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Command (Zoom / Translation)
+
+interface Commande {
+    +executer() : void
+    +annuler() : void
+}
+
+class CommandeZoom implements Commande {
+    -niveauPrecedent : double
+    -niveauNouveau : double
+    -perspective : Perspective
+    +CommandeZoom(perspective : Perspective, niveauNouveau : double)
+    +executer() : void
+    +annuler() : void
+}
+
+class CommandeTranslation implements Commande {
+    -deplacementX : double
+    -deplacementY : double
+    -positionPrecedenteX : double
+    -positionPrecedenteY : double
+    -perspective : Perspective
+    +CommandeTranslation(perspective : Perspective, dx : double, dy : double)
+    +executer() : void
+    +annuler() : void
+}
+
+class GestionnaireCommandes {
+    -historique : Stack<Commande>
+    -annulees : Stack<Commande>
+    +executerCommande(cmd : Commande) : void
+    +annulerDerniere() : void
+    +refaireDerniere() : void
+}
+
+class Perspective {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+    +modifierZoom(nouveau : double) : void
+    +modifierPosition(dx : double, dy : double) : void
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+Commande <|.. CommandeZoom
+Commande <|.. CommandeTranslation
+GestionnaireCommandes --> Commande : utilise
+CommandeZoom --> Perspective : agit sur
+CommandeTranslation --> Perspective : agit sur
+Perspective "1" o-- "plusieurs" Commande : opérations
+
+@enduml

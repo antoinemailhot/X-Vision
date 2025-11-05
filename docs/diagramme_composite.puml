@@ -1,0 +1,47 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON COMPOSITE
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Gestion hiérarchique des perspectives
+'               (perspectives simples et composites)
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Composite
+
+' Composant abstrait
+interface PerspectiveComponent {
+    +afficher() : void
+    +ajouter(p : PerspectiveComponent) : void
+    +supprimer(p : PerspectiveComponent) : void
+    +getEnfants() : List<PerspectiveComponent>
+}
+
+' Feuille : Perspective simple
+class PerspectiveLeaf implements PerspectiveComponent {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+    +afficher() : void
+    +ajouter(p : PerspectiveComponent) : void
+    +supprimer(p : PerspectiveComponent) : void
+    +getEnfants() : List<PerspectiveComponent>
+}
+
+' Composite : Perspective composée
+class PerspectiveComposite implements PerspectiveComponent {
+    -enfants : List<PerspectiveComponent>
+    +afficher() : void
+    +ajouter(p : PerspectiveComponent) : void
+    +supprimer(p : PerspectiveComponent) : void
+    +getEnfants() : List<PerspectiveComponent>
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+PerspectiveLeaf ..|> PerspectiveComponent
+PerspectiveComposite ..|> PerspectiveComponent
+PerspectiveComposite --> PerspectiveComponent : contient
+
+@enduml

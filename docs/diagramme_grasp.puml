@@ -1,0 +1,62 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PRINCIPES GRASP
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Application des principes GRASP
+'               (faible couplage, forte cohésion, expert en information)
+' =====================================================
+
+title X-Vision - Diagramme de classes : Principes GRASP
+
+' Exemple de Modèle
+class Image {
+    -cheminFichier : String
+    -format : String
+    +charger() : void
+    +sauvegarder() : void
+}
+
+class Perspective {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+    +afficher() : void
+}
+
+' Controller central
+class ControleurPerspective {
+    +zoom(p : Perspective, facteur : double) : void
+    +translater(p : Perspective, dx : double, dy : double) : void
+}
+
+' Gestion de commandes et undo/redo
+class GestionnaireCommandes {
+    -historique : List<Commande>
+    +executer(c : Commande) : void
+    +undo() : void
+    +redo() : void
+}
+
+' Observateur / Vue
+class VuePerspective {
+    +mettreAJour() : void
+}
+
+' =====================================================
+' APPLICATION DES PRINCIPES GRASP
+' =====================================================
+' Information Expert : Perspective sait gérer son état (zoom, position)
+Perspective --> VuePerspective : notifie (Observer)
+
+' Low Coupling / High Cohesion :
+ControleurPerspective --> Perspective
+ControleurPerspective --> GestionnaireCommandes
+
+' Creator : GestionnaireCommandes crée les objets Commande
+GestionnaireCommandes --> Commande
+
+' Controller : ControleurPerspective centralise les opérations utilisateur
+ControleurPerspective --> VuePerspective
+
+@enduml

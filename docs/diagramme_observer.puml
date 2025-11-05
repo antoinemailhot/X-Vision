@@ -1,0 +1,55 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE SÉQUENCE - PATRON OBSERVATEUR
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Synchronisation des vues après une modification
+'               du modèle (Image/Perspective)
+' =====================================================
+
+title X-Vision - Diagramme de séquence : Patron Observateur (Image / Perspective / Vues)
+
+participant "Perspective (Sujet)" as P
+participant "Image (Sujet)" as I
+participant "VuePrincipale (Observateur)" as V
+participant "VuePerspective (Observateur)" as VP
+participant "VueMiniature (Observateur)" as VM
+
+' =====================================================
+' SCÉNARIO : Mise à jour de la perspective après un zoom
+' =====================================================
+
+activate P
+P -> I : modifierParamètresZoom(nouveauNiveau)
+activate I
+I -> I : mettreÀJourDonnées()
+deactivate I
+
+' --- Notification des observateurs inscrits ---
+P -> P : notifierObservateurs()
+loop pour chaque observateur inscrit
+    P -> V : mettreAJour(P)
+    activate V
+    V -> V : rafraîchirAffichage()
+    deactivate V
+
+    P -> VP : mettreAJour(P)
+    activate VP
+    VP -> VP : redessinerPerspective()
+    deactivate VP
+
+    P -> VM : mettreAJour(P)
+    activate VM
+    VM -> VM : redessinerMiniature()
+    deactivate VM
+end
+deactivate P
+
+' =====================================================
+' LÉGENDE :
+'  - Perspective/Image = Sujet(s) observé(s)
+'  - VuePrincipale, VuePerspective, VueMiniature = Observateurs
+'  - Notifie() appelle mettreAJour() sur chaque vue inscrite
+' =====================================================
+
+@enduml

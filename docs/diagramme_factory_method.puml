@@ -1,0 +1,51 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON FACTORY METHOD
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Création flexible d’objets Perspective et Image
+'               via le patron Factory Method.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Factory Method
+
+' Interface pour les objets créés
+interface Produit {
+}
+
+class Perspective implements Produit {
+    -niveauZoom : double
+    -positionX : double
+    -positionY : double
+    +afficher() : void
+}
+
+class Image implements Produit {
+    -cheminFichier : String
+    -format : String
+    +charger() : void
+    +sauvegarder() : void
+}
+
+' Interface de la Factory
+interface Fabrique {
+    +creerProduit(type : String) : Produit
+}
+
+class FabriquePerspective implements Fabrique {
+    +creerProduit(type : String) : Produit
+}
+
+class FabriqueImage implements Fabrique {
+    +creerProduit(type : String) : Produit
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+Fabrique <|.. FabriquePerspective
+Fabrique <|.. FabriqueImage
+Perspective ..|> Produit
+Image ..|> Produit
+
+@enduml

@@ -1,0 +1,52 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON SINGLETON
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Gestionnaire central unique pour
+'               l’historique des commandes et le cache.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Singleton (Gestionnaire central)
+
+class GestionnaireCentral {
+    -instance : GestionnaireCentral
+    -historique : Historique
+    -cacheImages : Map<String, Image>
+    
+    +getInstance() : GestionnaireCentral
+    +ajouterCache(cle : String, img : Image) : void
+    +recupererCache(cle : String) : Image
+    +executerCommande(cmd : Commande) : void
+    +annulerDerniereCommande() : void
+    +refaireDerniereCommande() : void
+}
+
+class Historique {
+    -pileUndo : Stack<Commande>
+    -pileRedo : Stack<Commande>
+    +ajouterCommande(cmd : Commande) : void
+    +annulerDerniere() : void
+    +refaireDerniere() : void
+}
+
+class Commande {
+    +executer() : void
+    +annuler() : void
+}
+
+class Image {
+    -cheminFichier : String
+    -données : byte[]
+    +charger() : void
+    +sauvegarder() : void
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+GestionnaireCentral --> Historique : possède
+GestionnaireCentral --> Commande : exécute
+GestionnaireCentral --> Image : gère le cache
+
+@enduml

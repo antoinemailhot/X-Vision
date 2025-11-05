@@ -1,0 +1,67 @@
+@startuml
+' =====================================================
+' DIAGRAMME DE CLASSES - PATRON ADAPTER
+' Projet : X-Vision
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Description : Adaptation des formats d’images (PNG, JPEG, SVG)
+'               pour une interface uniforme dans l’application.
+' =====================================================
+
+title X-Vision - Diagramme de classes : Patron Adapter
+
+' Interface cible pour toutes les images
+interface ImageTarget {
+    +charger(chemin : String) : void
+    +afficher() : void
+}
+
+' Classe existante pour les images PNG
+class ImagePNG {
+    +chargerPNG(chemin : String) : void
+    +afficherPNG() : void
+}
+
+' Classe existante pour les images JPEG
+class ImageJPEG {
+    +chargerJPEG(chemin : String) : void
+    +afficherJPEG() : void
+}
+
+' Classe existante pour les images SVG
+class ImageSVG {
+    +chargerSVG(chemin : String) : void
+    +afficherSVG() : void
+}
+
+' Adapter pour PNG
+class AdapterPNG implements ImageTarget {
+    -adaptee : ImagePNG
+    +charger(chemin : String) : void
+    +afficher() : void
+}
+
+' Adapter pour JPEG
+class AdapterJPEG implements ImageTarget {
+    -adaptee : ImageJPEG
+    +charger(chemin : String) : void
+    +afficher() : void
+}
+
+' Adapter pour SVG
+class AdapterSVG implements ImageTarget {
+    -adaptee : ImageSVG
+    +charger(chemin : String) : void
+    +afficher() : void
+}
+
+' =====================================================
+' RELATIONS ENTRE LES CLASSES
+' =====================================================
+AdapterPNG --> ImagePNG : utilise
+AdapterJPEG --> ImageJPEG : utilise
+AdapterSVG --> ImageSVG : utilise
+AdapterPNG ..|> ImageTarget
+AdapterJPEG ..|> ImageTarget
+AdapterSVG ..|> ImageTarget
+
+@enduml
