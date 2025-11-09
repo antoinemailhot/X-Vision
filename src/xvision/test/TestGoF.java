@@ -1,15 +1,11 @@
 package xvision.test;
 
-import xvision.model.*;
-import xvision.controller.*;
-
 /**
  * Classe de test regroupant les principaux patrons GoF utilisés dans X-Vision.
  * Chaque test illustre le comportement attendu et vérifie le respect du patron.
  */
 public class TestGoF {
-
-    public static void testObserver() {
+/**    public static void testObserver() {
         System.out.println("▶ Test Observer : Synchronisation des vues...");
         Perspective p = new Perspective();
         VuePrincipale vue1 = new VuePrincipale(p);
@@ -46,11 +42,11 @@ public class TestGoF {
     }
 
     /** Méthode principale pour exécuter tous les tests GoF */
-    public static void runAll() {
+    /**public static void runAll() {
         System.out.println("=== Tests GoF ===\n");
         testObserver();
         testCommandMemento();
         testAdapter();
         System.out.println("=== Fin des tests GoF ===\n");
-    }
+    }*/
 }

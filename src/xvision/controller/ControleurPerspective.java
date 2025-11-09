@@ -13,6 +13,7 @@ public class ControleurPerspective {
         gestionnaire.ajouterPerspectiveSimple(zoom, x, y);
     }
 
+
     public void afficherToutes() {
         gestionnaire.afficherToutes();
     }

@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "javac build",
+            "type": "shell",
+            "command": "javac",
+            "args": [
+                "xvision/model/*.java",
+                "xvision/*.java"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

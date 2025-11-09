@@ -99,3 +99,11 @@ A coder
 📚 Auteurs
 
 Projet réalisé dans le cadre du cours INF1163 – Université du Québec en Outaouais (UQO)
+
+
+(Refactorisation)
+Pour info compil  :
+ 
+antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ find . -name "*.class" -delete
+antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ javac xvision/model/*.java xvision/*.java xvision/test/*.java
+antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ java xvision.MainGUI

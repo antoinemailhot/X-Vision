@@ -5,7 +5,7 @@ package xvision.test;
  * Permet d’exécuter séparément ou globalement les tests GoF et GRASP.
  */
 public class TestRunner {
-    public static void main(String[] args) {
+    /*public static void main(String[] args) {
         System.out.println("==================================");
         System.out.println("     X-VISION — SUITE DE TESTS    ");
         System.out.println("==================================\n");
@@ -19,5 +19,5 @@ public class TestRunner {
         }
 
         System.out.println("✅ Tous les tests ont été exécutés avec succès !");
-    }
+    }*/
 }

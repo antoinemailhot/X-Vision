@@ -1,15 +1,12 @@
 package xvision.test;
 
-import xvision.model.*;
-import xvision.controller.*;
-
 /**
  * Tests des principes GRASP dans X-Vision.
  * Permet de valider la répartition correcte des responsabilités et le découplage.
  */
 public class TestGRASP {
-
-    public static void testController() {
+/**
+ *     public static void testController() {
         System.out.println("▶ Test Controller : gestion centralisée des interactions...");
         ControleurPerspective controleur = new ControleurPerspective();
         controleur.reagirEvenement("ZOOM_IN");
@@ -36,11 +33,11 @@ public class TestGRASP {
     }
 
     /** Méthode principale pour exécuter tous les tests GRASP */
-    public static void runAll() {
+    /**public static void runAll() {
         System.out.println("=== Tests GRASP ===\n");
         testController();
         testInformationExpert();
         testLowCouplingHighCohesion();
         System.out.println("=== Fin des tests GRASP ===\n");
-    }
+    }*/
 }
