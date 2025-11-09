@@ -1,11 +1,7 @@
 package xvision.controller;
 
-import xvision.model.Perspective;
+import xvision.model.PerspectiveLeaf;
 
-/**
- * Gestionnaire de copie/coller utilisant le Mediator pour orchestrer
- * les transferts entre perspectives selon les stratégies choisies.
- */
 public class GestionnaireCopie {
     private MediatorCopie mediator;
 
@@ -13,11 +9,11 @@ public class GestionnaireCopie {
         this.mediator = mediator;
     }
 
-    public void copier(Perspective source) {
+    public void copier(PerspectiveLeaf source) {
         mediator.notifier(source, "copier", null);
     }
 
-    public void coller(Perspective cible) {
+    public void coller(PerspectiveLeaf cible) {
         mediator.notifier(cible, "coller", null);
     }
 }

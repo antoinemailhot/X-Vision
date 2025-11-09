@@ -1,57 +1,108 @@
 package xvision.model;
 
-import java.util.UUID;
+import java.io.File;
+import java.util.*;
+import java.nio.file.Files;
 
 /**
- * Gestionnaire central des perspectives de X-Vision.
- * Implémente le patron Composite pour gérer des structures hiérarchiques
- * et s’intègre dans le modèle MVC comme point d’entrée du module « Perspective ».
+ * Gestionnaire des perspectives : création, stockage, sauvegarde, chargement
+ * Utilisation de JSON "maison" sans librairie externe
  */
 public class GestionnaireDePerspectives {
 
-    // Racine de la hiérarchie des perspectives
-    private PerspectiveComponent racine;
+    private Map<String, PerspectiveComponent> perspectives = new HashMap<>();
 
-    public GestionnaireDePerspectives() {
-        this.racine = new PerspectiveComposite();
+    public void ajouterPerspective(String id, PerspectiveComponent p) {
+        perspectives.put(id, p);
     }
 
-    /**
-     * Ajoute une nouvelle perspective simple à la racine ou à un groupe spécifique.
-     */
-    public void ajouterPerspectiveSimple(double zoom, double x, double y) {
-        PerspectiveLeaf nouvelle = new PerspectiveLeaf(zoom, x, y);
-        racine.ajouter(nouvelle);
+    public PerspectiveComponent getPerspective(String id) {
+        return perspectives.get(id);
     }
 
-    /**
-     * Ajoute un sous-groupe de perspectives.
-     */
-    public PerspectiveComposite creerSousGroupe() {
-        PerspectiveComposite groupe = new PerspectiveComposite();
-        racine.ajouter(groupe);
-        return groupe;
+    public void supprimerPerspective(String id) {
+        perspectives.remove(id);
     }
 
-    /**
-     * Supprime une perspective spécifique du composite racine.
-     */
-    public void supprimerPerspective(PerspectiveComponent p) {
-        racine.supprimer(p);
+    public void sauvegarderToutes(String dossier) {
+        File dir = new File(dossier);
+        if (!dir.exists()) dir.mkdirs();
+
+        for (Map.Entry<String, PerspectiveComponent> entry : perspectives.entrySet()) {
+            sauvegarderPerspective(entry.getKey(), dossier);
+        }
     }
 
-    /**
-     * Affiche récursivement toutes les perspectives (utile pour debug ou console MVC).
-     */
+    public void sauvegarderPerspective(String id, String dossier) {
+        PerspectiveComponent p = perspectives.get(id);
+        if (p == null) return;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"id\": \"").append(id).append("\",\n");
+        sb.append("  \"nom\": \"").append(p.getClass().getSimpleName()).append("\",\n");
+        sb.append("  \"zoom\": ").append(getZoom(p)).append(",\n");
+        sb.append("  \"centerX\": ").append(getCentreX(p)).append(",\n");
+        sb.append("  \"centerY\": ").append(getCentreY(p)).append(",\n");
+        sb.append("  \"timestamp\": ").append(System.currentTimeMillis() / 1000).append("\n");
+        sb.append("}\n");
+
+        try {
+            File fichier = new File(dossier + "/" + id + ".json");
+            Files.writeString(fichier.toPath(), sb.toString());
+            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " sauvegardée.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void chargerPerspective(String cheminFichier) {
+        try {
+            List<String> lignes = Files.readAllLines(new File(cheminFichier).toPath());
+            double zoom = 1.0, x = 0.0, y = 0.0;
+            String id = "unknown";
+
+            for (String ligne : lignes) {
+                ligne = ligne.trim();
+                if (ligne.startsWith("\"id\"")) {
+                    id = ligne.split(":")[1].replace("\"","").replace(",","").trim();
+                } else if (ligne.startsWith("\"zoom\"")) {
+                    zoom = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                } else if (ligne.startsWith("\"centerX\"")) {
+                    x = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                } else if (ligne.startsWith("\"centerY\"")) {
+                    y = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                }
+            }
+
+            PerspectiveLeaf p = new PerspectiveLeaf(zoom, x, y);
+            ajouterPerspective(id, p);
+            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " chargée.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private double getZoom(PerspectiveComponent p) {
+        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getZoom();
+        return 1.0;
+    }
+
+    private double getCentreX(PerspectiveComponent p) {
+        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getCentreX();
+        return 0.0;
+    }
+
+    private double getCentreY(PerspectiveComponent p) {
+        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getCentreY();
+        return 0.0;
+    }
+
     public void afficherToutes() {
-        System.out.println("=== Hiérarchie des perspectives (UUID: " + UUID.randomUUID() + ") ===");
-        racine.afficher();
-    }
-
-    /**
-     * Retourne la racine du composite (pour interaction directe avec le contrôleur).
-     */
-    public PerspectiveComponent getRacine() {
-        return racine;
+        for (Map.Entry<String, PerspectiveComponent> entry : perspectives.entrySet()) {
+            System.out.println("ID: " + entry.getKey());
+            entry.getValue().afficher();
+        }
     }
 }
