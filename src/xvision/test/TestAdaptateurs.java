@@ -11,11 +11,20 @@ import xvision.model.*;
  * 3. Test de l'interface uniforme ImageTarget
  * 4. Test de détection de format
  * 5. Test de gestion d'erreurs
+ * 6. ⭐ NOUVEAU: Test de chargement réel d'images
  *
  * @author Antoine Mailhot & Micaël Racine-Leblanc
  * @version 1.0
  */
 public class TestAdaptateurs {
+
+    /**
+     * Chemins vers les images de test
+     */
+    private static final String RESOURCES_PATH = "../resources/test_images/";
+    private static final String IMAGE_PNG = RESOURCES_PATH + "test.png";
+    private static final String IMAGE_JPEG = RESOURCES_PATH + "test.jpg";
+    private static final String IMAGE_SVG = RESOURCES_PATH + "test.svg";
 
     public static void main(String[] args) {
         System.out.println("=".repeat(70));
@@ -43,6 +52,9 @@ public class TestAdaptateurs {
         System.out.println();
 
         testGestionErreurs();
+        System.out.println();
+
+        testChargementReelImages();
         System.out.println();
 
         System.out.println("=".repeat(70));
@@ -249,9 +261,72 @@ public class TestAdaptateurs {
     }
 
     /**
-     * Méthode utilitaire pour afficher un séparateur
+     * Test 8: Chargement réel d'images depuis le système de fichiers
+     * Valide que les adaptateurs fonctionnent avec de vraies images.
      */
-    private static void afficherSeparateur() {
+    private static void testChargementReelImages() {
+        System.out.println("[TEST 8] Chargement réel d'images");
         System.out.println("-".repeat(70));
+
+        // Vérifier que les fichiers existent
+        java.io.File fichierPNG = new java.io.File(IMAGE_PNG);
+        java.io.File fichierJPEG = new java.io.File(IMAGE_JPEG);
+        java.io.File fichierSVG = new java.io.File(IMAGE_SVG);
+
+        if (!fichierPNG.exists() || !fichierJPEG.exists() || !fichierSVG.exists()) {
+            System.out.println("ATTENTION: Images de test manquantes!");
+            System.out.println("Veuillez placer les images dans: " + RESOURCES_PATH);
+            System.out.println("Test IGNORÉ");
+            return;
+        }
+
+        System.out.println("Fichiers trouvés:");
+        System.out.println("  - " + IMAGE_PNG + " (" + (fichierPNG.length() / 1024) + " KB)");
+        System.out.println("  - " + IMAGE_JPEG + " (" + (fichierJPEG.length() / 1024) + " KB)");
+        System.out.println("  - " + IMAGE_SVG + " (" + (fichierSVG.length() / 1024) + " KB)");
+        System.out.println();
+
+        // Test PNG
+        System.out.println("Test chargement PNG:");
+        testChargerImage(IMAGE_PNG, "PNG");
+
+        // Test JPEG
+        System.out.println("Test chargement JPEG:");
+        testChargerImage(IMAGE_JPEG, "JPEG");
+
+        // Test SVG
+        System.out.println("Test chargement SVG:");
+        testChargerImage(IMAGE_SVG, "SVG");
+
+        System.out.println("✓ Test chargement réel d'images: RÉUSSI");
+    }
+
+    /**
+     * Charge et valide une image
+     * @param chemin Chemin vers l'image
+     * @param format Nom du format pour l'affichage
+     */
+    private static void testChargerImage(String chemin, String format) {
+        try {
+            ImageTarget image = FabriqueImage.creerImage(chemin);
+
+            int largeur = image.getLargeur();
+            int hauteur = image.getHauteur();
+            byte[] donnees = image.getDonneesPixels();
+
+            System.out.println("  Chargé: " + largeur + "x" + hauteur + " pixels");
+            System.out.println("  Données: " + donnees.length + " bytes");
+
+            assert largeur > 0 : format + ": largeur invalide";
+            assert hauteur > 0 : format + ": hauteur invalide";
+            assert donnees != null && donnees.length > 0 : format + ": données vides";
+
+            image.afficher();
+            System.out.println();
+
+        } catch (Exception e) {
+            System.out.println("  ERREUR: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
