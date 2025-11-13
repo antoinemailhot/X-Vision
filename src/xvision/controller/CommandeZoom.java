@@ -2,26 +2,46 @@ package xvision.controller;
 
 import xvision.model.PerspectiveLeaf;
 
+/**
+ * Commande pour modifier le zoom d'une perspective (Patron Command - GoF)
+ * Supporte l'annulation (Undo/Redo)
+ * Principe GRASP: Low Coupling - Modifie via les accesseurs, pas directement
+ *
+ * @author Antoine Mailhot & Micaël Racine-Leblanc
+ * @version 1.0
+ */
 public class CommandeZoom implements Commande {
     private PerspectiveLeaf perspective;
     private double ancienZoom;
     private double nouveauZoom;
 
+    /**
+     * Constructeur de la commande de zoom
+     * @param p La perspective à modifier
+     * @param zoom Le nouveau niveau de zoom
+     */
     public CommandeZoom(PerspectiveLeaf p, double zoom) {
         this.perspective = p;
         this.nouveauZoom = zoom;
     }
 
+    /**
+     * Exécute la commande: applique le nouveau zoom
+     * La notification des observateurs est automatique via setZoom()
+     */
     @Override
     public void executer() {
         ancienZoom = perspective.getZoom();
         perspective.setZoom(nouveauZoom);
-        perspective.notifierObservateurs();
+        // Note: setZoom() appelle automatiquement notifier() (patron Observer)
     }
 
+    /**
+     * Annule la commande: restaure l'ancien zoom
+     */
     @Override
     public void annuler() {
         perspective.setZoom(ancienZoom);
-        perspective.notifierObservateurs();
+        // Note: setZoom() appelle automatiquement notifier() (patron Observer)
     }
 }

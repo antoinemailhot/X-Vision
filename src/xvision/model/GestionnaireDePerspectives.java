@@ -106,18 +106,28 @@ public class GestionnaireDePerspectives {
         }
     }
 
-    public void ajouterPerspectiveSimple(double zoom, double x, double y) {
-    // Génère un ID unique basé sur le temps et un nombre aléatoire
-    String id = "perspective_" + System.currentTimeMillis() + "_" + new Random().nextInt(1000);
+    /**
+     * Ajoute une perspective simple avec génération automatique d'ID
+     * Principe GRASP: Creator - Le gestionnaire crée les perspectives
+     * @param zoom Niveau de zoom initial
+     * @param x Position X initiale
+     * @param y Position Y initiale
+     * @return La perspective créée
+     */
+    public PerspectiveLeaf ajouterPerspectiveSimple(double zoom, double x, double y) {
+        // Génère un ID unique basé sur le temps et un nombre aléatoire
+        String id = "perspective_" + System.currentTimeMillis() + "_" + new Random().nextInt(1000);
 
-    // Crée une nouvelle perspective
-    PerspectiveLeaf nouvellePerspective = new PerspectiveLeaf(zoom, x, y);
+        // Crée une nouvelle perspective
+        PerspectiveLeaf nouvellePerspective = new PerspectiveLeaf(zoom, x, y);
 
-    // Ajoute la perspective à la collection
-    perspectives.put(id, nouvellePerspective);
+        // Ajoute la perspective à la collection
+        perspectives.put(id, nouvellePerspective);
 
-    // Message de confirmation
-    System.out.println("[GestionnaireDePerspectives] Nouvelle perspective ajoutée : " + id);
-}
+        // Message de confirmation
+        System.out.println("[GestionnaireDePerspectives] Nouvelle perspective ajoutée : " + id);
+
+        return nouvellePerspective;
+    }
 
 }
