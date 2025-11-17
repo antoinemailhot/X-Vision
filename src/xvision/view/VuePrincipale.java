@@ -2,8 +2,8 @@ package xvision.view;
 
 import javax.swing.*;
 import xvision.model.PerspectiveLeaf;
-import xvision.model.Sujet;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.io.File;
@@ -13,9 +13,6 @@ import java.io.IOException;
  * Vue principale de l'application X-Vision
  * Affiche les informations de la perspective observée (Patron Observer - GoF)
  * Principe GRASP: Low Coupling - Observe via l'interface, pas de couplage fort
- *
- * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 1.0
  */
 public class VuePrincipale extends JFrame implements ObserverIF {
 
@@ -34,7 +31,7 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         super();
         this.perspective = p;
 
-        // Enregistrement comme observateur (Patron Observer)
+        // Enregistrement comme observateur
         if (p != null) {
             p.attacher(this);
         }
@@ -42,7 +39,7 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         setTitle("Vue Principale - X-Vision");
         setSize(600, 400);
         setLayout(new BorderLayout());
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // fermer uniquement cette fenêtre
 
         // Panneau supérieur pour les informations
         JPanel panelInfo = new JPanel(new GridLayout(3, 1));
@@ -64,12 +61,10 @@ public class VuePrincipale extends JFrame implements ObserverIF {
                     g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                                          RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-                    // Appliquer le zoom
                     double zoom = perspective.getZoom();
                     int largeur = (int) (imageChargee.getWidth() * zoom);
                     int hauteur = (int) (imageChargee.getHeight() * zoom);
 
-                    // Calculer la position avec translation
                     int x = (int) ((getWidth() - largeur) / 2 + perspective.getCentreX());
                     int y = (int) ((getHeight() - hauteur) / 2 + perspective.getCentreY());
 
@@ -79,6 +74,35 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         };
         panelImage.setBackground(Color.WHITE);
         add(panelImage, BorderLayout.CENTER);
+
+        // ----- Raccourcis Undo/Redo pour cette fenêtre -----
+        int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+
+        // Undo
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
+        getRootPane().getActionMap().put("undo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (perspective != null) {
+                    perspective.undo();
+                    System.out.println("[VuePrincipale] Undo effectué");
+                }
+            }
+        });
+
+        // Redo
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
+        getRootPane().getActionMap().put("redo", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (perspective != null) {
+                    perspective.redo();
+                    System.out.println("[VuePrincipale] Redo effectué");
+                }
+            }
+        });
 
         setVisible(true);
         actualiser();
@@ -94,7 +118,6 @@ public class VuePrincipale extends JFrame implements ObserverIF {
             labelZoom.setText("Zoom: " + perspective.getZoom());
             labelPos.setText("Position: (" + perspective.getCentreX() + "," + perspective.getCentreY() + ")");
 
-            // Charger l'image si le chemin est défini
             String cheminImage = perspective.getCheminImage();
             if (cheminImage != null && !cheminImage.isEmpty()) {
                 try {
@@ -110,7 +133,6 @@ public class VuePrincipale extends JFrame implements ObserverIF {
                 labelImage.setText("Image: Aucune");
             }
 
-            // Rafraîchir le panneau d'image
             if (panelImage != null) {
                 panelImage.repaint();
             }
@@ -118,24 +140,21 @@ public class VuePrincipale extends JFrame implements ObserverIF {
     }
 
     /**
-     * Modifie la perspective observée
-     * Principe GRASP: Information Expert
+     * Change la perspective observée par cette vue
      *
-     * @param p La nouvelle perspective à observer
+     * @param p Nouvelle perspective
      */
     public void setPerspective(PerspectiveLeaf p) {
-        // Détacher de l'ancienne perspective
         if (this.perspective != null) {
             this.perspective.detacher(this);
         }
 
-        // Attacher à la nouvelle perspective
         this.perspective = p;
+
         if (p != null) {
             p.attacher(this);
         }
 
-        // Rafraîchir immédiatement
         actualiser();
     }
 }
