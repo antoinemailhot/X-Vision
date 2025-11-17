@@ -76,6 +76,7 @@ public class MainGUI {
 
             // ---- ACTIONS ----
             btnCreer.addActionListener(e -> {
+                // Création de la perspective
                 PerspectiveLeaf perspective = controleur.creerPerspective(1.0, 0, 0);
                 perspectiveCourante[0] = perspective;
                 toutesPerspectives.add(perspective);
@@ -98,13 +99,17 @@ public class MainGUI {
                     }
                 });
 
-                // Ouvrir automatiquement la perspective nouvellement créée
-                ouvrirFenetrePerspective(perspective, fenetresOuvertes);
+                // ===== OUVERTURE AUTOMATIQUE =====
+                VuePrincipale vue = ouvrirFenetrePerspective(perspective, fenetresOuvertes);
+                vue.toFront();             // Met la fenêtre au premier plan
+                vue.requestFocus();        // Donne le focus
+                perspectiveCourante[0] = perspective; // Sélectionne la perspective courante
 
                 JOptionPane.showMessageDialog(frame,
-                        "Perspective créée avec 1 vignette!\nLa fenêtre a été ouverte automatiquement.",
+                        "Perspective créée avec 1 vignette!\nLa fenêtre a été ouverte et sélectionnée automatiquement.",
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
             });
+
 
             btnOuvrir.addActionListener(e -> {
                 if (perspectiveCourante[0] != null) {
@@ -177,12 +182,14 @@ public class MainGUI {
     /**
      * Ouvre la fenêtre VuePrincipale pour la perspective donnée
      * Si elle existe déjà, la met en avant
+     * @return 
      */
-    private static void ouvrirFenetrePerspective(PerspectiveLeaf perspective, Map<PerspectiveLeaf, VuePrincipale> fenetres) {
+    private static VuePrincipale ouvrirFenetrePerspective(PerspectiveLeaf perspective, Map<PerspectiveLeaf, VuePrincipale> fenetres) {
         if (fenetres.containsKey(perspective)) {
             VuePrincipale vue = fenetres.get(perspective);
             vue.toFront();
             vue.requestFocus();
+            return vue;
         } else {
             VuePrincipale vue = new VuePrincipale(perspective);
             fenetres.put(perspective, vue);
@@ -192,6 +199,7 @@ public class MainGUI {
                     fenetres.remove(perspective);
                 }
             });
+            return vue;
         }
     }
 }
