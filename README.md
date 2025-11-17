@@ -82,28 +82,18 @@ git clone https://github.com/<ton-utilisateur>/X-Vision.git
 cd X-Vision
 ```
 
-(MainGUI.java)
-
 Compiler
 ```bash
-A coder
+javac MainGUI.java
 ```
 
 Exécuter
 ```bash
-A coder
+java MainGUI.java
 ```
 
 💡 Astuce : Pour éviter de gérer manuellement les dépendances et compiler tous les fichiers, tu peux utiliser Gradle ou Maven. Je peux te préparer un build.gradle prêt à l’emploi si tu veux.
 
-📚 Auteurs
+📚 Auteurs : Antoine Mailhot & Micaël Racine-Leblanc
 
 Projet réalisé dans le cadre du cours INF1163 – Université du Québec en Outaouais (UQO)
-
-
-(Refactorisation)
-Pour info compil  :
- 
-antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ find . -name "*.class" -delete
-antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ javac xvision/model/*.java xvision/*.java xvision/test/*.java
-antoinemailhot@AMROG-U:~/Bureau/X-Vision/src$ java xvision.MainGUI
