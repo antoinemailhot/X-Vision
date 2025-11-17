@@ -31,6 +31,23 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     }
 
     /**
+     * Crée un Memento de l'état courant.
+     */
+    public PerspectiveMemento creerMemento() {
+        return new PerspectiveMemento(this.niveauZoom, this.positionX, this.positionY);
+    }
+
+    /**
+     * Restaure l'état depuis un Memento.
+     */
+    public void restaurerDepuisMemento(PerspectiveMemento m) {
+        this.niveauZoom = m.getZoom();
+        this.positionX = m.getX();
+        this.positionY = m.getY();
+        notifier(); // Mise à jour des vues (Observer)
+    }
+
+    /**
      * Retourne le niveau de zoom actuel
      * @return Le niveau de zoom
      */
