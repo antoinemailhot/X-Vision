@@ -4,20 +4,24 @@ import java.util.Stack;
 
 /**
  * Caretaker du patron Memento.
- * Gère les piles Undo/Redo pour restaurer l'état des perspectives.
+ * Gère les piles Undo/Redo pour une perspective unique.
  *
- * Principe GRASP : Low Coupling — les contrôleurs ne connaissent pas l'état interne.
+ * Principe GRASP : Low Coupling — aucune connaissance de l’interne de la perspective.
  * Patron Memento : Gestion centralisée des états successifs.
- *
  */
 public class GestionnaireMemento {
 
-    private Stack<PerspectiveMemento> pileUndo = new Stack<>();
-    private Stack<PerspectiveMemento> pileRedo = new Stack<>();
+    // Pile des états précédents (Undo)
+    private final Stack<PerspectiveMemento> pileUndo = new Stack<>();
+
+    // Pile des états annulés (Redo)
+    private final Stack<PerspectiveMemento> pileRedo = new Stack<>();
 
     /**
-     * Sauvegarde un moment de l'état.
-     * @param memento Le memento à sauvegarder.
+     * Sauvegarde un memento dans la pile Undo.
+     * Reset la pile Redo (logique standard d’un éditeur).
+     *
+     * @param memento Memento représentant l’état de la perspective.
      */
     public void sauvegarder(PerspectiveMemento memento) {
         pileUndo.push(memento);
@@ -25,7 +29,8 @@ public class GestionnaireMemento {
     }
 
     /**
-     * Récupère le dernier état Undo.
+     * Annule la dernière action (Undo) et bascule l’état vers Redo.
+     * @return Le memento à restaurer, ou null s'il n’y a rien à annuler.
      */
     public PerspectiveMemento undo() {
         if (!pileUndo.isEmpty()) {
@@ -37,7 +42,8 @@ public class GestionnaireMemento {
     }
 
     /**
-     * Récupère le dernier état Redo.
+     * Refait la dernière action annulée (Redo).
+     * @return Le memento à restaurer, ou null s'il n’y a rien à refaire.
      */
     public PerspectiveMemento redo() {
         if (!pileRedo.isEmpty()) {
