@@ -87,4 +87,13 @@ public class ControleurPerspective {
     public GestionnaireDePerspectives getGestionnaire() {
         return gestionnaire;
     }
+
+    public void zoomerAvecFacteur(PerspectiveLeaf perspective, double facteurMultiplicatif) {
+    double zoomActuel = perspective.getZoom();
+    double nouveauZoom = zoomActuel * facteurMultiplicatif;
+    // limiter entre 0.1 et 10
+    nouveauZoom = Math.max(0.1, Math.min(nouveauZoom, 10.0));
+    perspective.setZoom(nouveauZoom);
+}
+
 }

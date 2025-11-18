@@ -2,8 +2,9 @@ package xvision.view;
 
 import javax.swing.*;
 import xvision.model.PerspectiveLeaf;
+import xvision.controller.ControleurPerspective;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.io.File;
@@ -17,32 +18,31 @@ import java.io.IOException;
 public class VuePrincipale extends JFrame implements ObserverIF {
 
     private PerspectiveLeaf perspective;
+    private ControleurPerspective controleur;
     private JLabel labelZoom, labelPos, labelImage;
     private JPanel panelImage;
     private BufferedImage imageChargee;
 
     /**
-     * Constructeur de la vue principale
-     * S'enregistre automatiquement comme observateur de la perspective
-     *
-     * @param p La perspective à observer
+     * Constructeur: initialise la fenêtre avec la perspective et le contrôleur
      */
-    public VuePrincipale(PerspectiveLeaf p) {
+    public VuePrincipale(PerspectiveLeaf perspective, ControleurPerspective controleur) {
         super();
-        this.perspective = p;
+        this.perspective = perspective;
+        this.controleur = controleur;
 
-        // Enregistrement comme observateur
-        if (p != null) {
-            p.attacher(this);
+        // Attacher la vue comme observateur
+        if (perspective != null) {
+            perspective.attacher(this);
         }
 
         setTitle("Vue Principale - X-Vision");
         setSize(600, 400);
         setLayout(new BorderLayout());
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // fermer uniquement cette fenêtre
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        // Panneau supérieur pour les informations
-        JPanel panelInfo = new JPanel(new GridLayout(3, 1));
+        // Panel info avec labels
+        JPanel panelInfo = new JPanel(new GridLayout(3,1));
         labelZoom = new JLabel();
         labelPos = new JLabel();
         labelImage = new JLabel();
@@ -51,7 +51,7 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         panelInfo.add(labelImage);
         add(panelInfo, BorderLayout.NORTH);
 
-        // Panneau central pour l'image
+        // Panel image avec dessin
         panelImage = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -75,32 +75,28 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         panelImage.setBackground(Color.WHITE);
         add(panelImage, BorderLayout.CENTER);
 
-        // ----- Raccourcis Undo/Redo pour cette fenêtre -----
-        int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
-
-        // Undo
-        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
-        getRootPane().getActionMap().put("undo", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (perspective != null) {
-                    perspective.undo();
-                    System.out.println("[VuePrincipale] Undo effectué");
-                }
+        // Zoom via molette avec le contrôleur
+        panelImage.addMouseWheelListener(e -> {
+            if (perspective != null && controleur != null) {
+                double facteur = Math.pow(1.1, -e.getWheelRotation());
+                controleur.zoomerAvecFacteur(perspective, facteur);
             }
         });
 
-        // Redo
+        // Undo/Redo via raccourcis clavier
+        int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-                .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
-        getRootPane().getActionMap().put("redo", new AbstractAction() {
-            @Override
+                     .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
+        getRootPane().getActionMap().put("undo", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (perspective != null) {
-                    perspective.redo();
-                    System.out.println("[VuePrincipale] Redo effectué");
-                }
+                if (perspective != null) perspective.undo();
+            }
+        });
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                     .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
+        getRootPane().getActionMap().put("redo", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (perspective != null) perspective.redo();
             }
         });
 
@@ -109,52 +105,40 @@ public class VuePrincipale extends JFrame implements ObserverIF {
     }
 
     /**
-     * Méthode de l'interface ObserverIF
-     * Appelée automatiquement quand la perspective change
+     * Méthode de l'interface ObserverIF: actualise les informations affichées
      */
     @Override
     public void actualiser() {
         if (perspective != null) {
-            labelZoom.setText("Zoom: " + perspective.getZoom());
-            labelPos.setText("Position: (" + perspective.getCentreX() + "," + perspective.getCentreY() + ")");
+            labelZoom.setText("Zoom: " + String.format("%.2f", perspective.getZoom()));
+            labelPos.setText("Position: (" + String.format("%.1f", perspective.getCentreX())
+                             + ", " + String.format("%.1f", perspective.getCentreY()) + ")");
 
             String cheminImage = perspective.getCheminImage();
             if (cheminImage != null && !cheminImage.isEmpty()) {
                 try {
                     imageChargee = ImageIO.read(new File(cheminImage));
                     labelImage.setText("Image: " + new File(cheminImage).getName());
-                    System.out.println("[VuePrincipale] Image chargée: " + cheminImage);
                 } catch (IOException e) {
-                    System.err.println("[VuePrincipale] Erreur lors du chargement de l'image: " + e.getMessage());
                     imageChargee = null;
                     labelImage.setText("Image: Erreur de chargement");
                 }
             } else {
+                imageChargee = null;
                 labelImage.setText("Image: Aucune");
             }
 
-            if (panelImage != null) {
-                panelImage.repaint();
-            }
+            if (panelImage != null) panelImage.repaint();
         }
     }
 
     /**
-     * Change la perspective observée par cette vue
-     *
-     * @param p Nouvelle perspective
+     * Change la perspective observée
      */
     public void setPerspective(PerspectiveLeaf p) {
-        if (this.perspective != null) {
-            this.perspective.detacher(this);
-        }
-
+        if (this.perspective != null) this.perspective.detacher(this);
         this.perspective = p;
-
-        if (p != null) {
-            p.attacher(this);
-        }
-
+        if (p != null) p.attacher(this);
         actualiser();
     }
 }

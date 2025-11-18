@@ -92,7 +92,7 @@ public class MainGUI {
                     @Override
                     public void mouseClicked(MouseEvent me) {
                         if (me.getClickCount() == 2) {
-                            ouvrirFenetrePerspective(perspective, fenetresOuvertes);
+                            ouvrirFenetrePerspective(perspective, fenetresOuvertes, controleur);
                         } else {
                             perspectiveCourante[0] = perspective;
                         }
@@ -100,20 +100,19 @@ public class MainGUI {
                 });
 
                 // ===== OUVERTURE AUTOMATIQUE =====
-                VuePrincipale vue = ouvrirFenetrePerspective(perspective, fenetresOuvertes);
-                vue.toFront();             // Met la fenêtre au premier plan
-                vue.requestFocus();        // Donne le focus
-                perspectiveCourante[0] = perspective; // Sélectionne la perspective courante
+                VuePrincipale vue = ouvrirFenetrePerspective(perspective, fenetresOuvertes, controleur);
+                vue.toFront();             
+                vue.requestFocus();        
+                perspectiveCourante[0] = perspective; 
 
                 JOptionPane.showMessageDialog(frame,
                         "Perspective créée avec 1 vignette!\nLa fenêtre a été ouverte et sélectionnée automatiquement.",
                         "Succès", JOptionPane.INFORMATION_MESSAGE);
             });
 
-
             btnOuvrir.addActionListener(e -> {
                 if (perspectiveCourante[0] != null) {
-                    ouvrirFenetrePerspective(perspectiveCourante[0], fenetresOuvertes);
+                    ouvrirFenetrePerspective(perspectiveCourante[0], fenetresOuvertes, controleur);
                 } else {
                     JOptionPane.showMessageDialog(frame, "Créez ou sélectionnez d'abord une perspective!");
                 }
@@ -180,18 +179,20 @@ public class MainGUI {
     }
 
     /**
-     * Ouvre la fenêtre VuePrincipale pour la perspective donnée
-     * Si elle existe déjà, la met en avant
-     * @return 
+     * Ouvre la fenêtre VuePrincipale pour la perspective donnée.
+     * Si elle existe déjà, la met en avant.
+     * Nécessite le contrôleur pour initialiser la vue.
      */
-    private static VuePrincipale ouvrirFenetrePerspective(PerspectiveLeaf perspective, Map<PerspectiveLeaf, VuePrincipale> fenetres) {
+    private static VuePrincipale ouvrirFenetrePerspective(PerspectiveLeaf perspective,
+                                                          Map<PerspectiveLeaf, VuePrincipale> fenetres,
+                                                          ControleurPerspective controleur) {
         if (fenetres.containsKey(perspective)) {
             VuePrincipale vue = fenetres.get(perspective);
             vue.toFront();
             vue.requestFocus();
             return vue;
         } else {
-            VuePrincipale vue = new VuePrincipale(perspective);
+            VuePrincipale vue = new VuePrincipale(perspective, controleur);
             fenetres.put(perspective, vue);
             vue.addWindowListener(new WindowAdapter() {
                 @Override
