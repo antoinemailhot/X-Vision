@@ -6,28 +6,30 @@ import java.util.List;
  * Perspective individuelle (feuille) dans l'arbre Composite.
  * Gère son état interne et son propre historique Memento.
  *
- * Principe GRASP: Information Expert — la feuille gère elle-même
- * son zoom, sa position et ses sauvegardes internes.
+ * Principes respectés :
+ * - GRASP (Information Expert) : la feuille connaît son état.
+ * - Memento : chaque modification crée un snapshot restaurable.
+ * - Observer : notifie les vues lors de tout changement.
  */
 public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
 
     // Identifiant unique pour cette perspective
     private final int idPerspective;
 
-    // Historique Memento indépendant pour chaque Leaf
-    private GestionnaireMemento gestionnaireMemento = new GestionnaireMemento();
+    // Historique Memento propre à cette perspective
+    private final GestionnaireMemento gestionnaireMemento = new GestionnaireMemento();
 
+    // État interne
     private double zoom;
     private double x;
     private double y;
     private String cheminImage;
 
     /**
-     * Constructeur d'une perspective feuille.
-     *
-     * @param zoom Niveau de zoom initial
-     * @param x Position X du centre
-     * @param y Position Y du centre
+     * Constructeur
+     * @param zoom niveau de zoom initial
+     * @param x    position X du centre
+     * @param y    position Y du centre
      */
     public PerspectiveLeaf(double zoom, double x, double y) {
         super();
@@ -41,31 +43,31 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     }
 
     /**
-     * Retourne l'identifiant unique de cette perspective.
+     * Identifiant unique de la perspective.
      */
     public int getIdPerspective() {
         return idPerspective;
     }
 
     /**
-     * Crée un Memento de l'état courant.
+     * Création d'un Memento sauvegardant l'état actuel.
      */
     public PerspectiveMemento creerMemento() {
         return new PerspectiveMemento(idPerspective, zoom, x, y);
     }
 
     /**
-     * Restaure l'état depuis un Memento.
+     * Restaure l'état depuis un Memento (Undo/Redo).
      */
     public void restaurerDepuisMemento(PerspectiveMemento m) {
         this.zoom = m.getZoom();
         this.x = m.getX();
         this.y = m.getY();
-        notifier(); // Mise à jour des vues (Observer)
+        notifier();
     }
 
     /**
-     * Annule la dernière modification (Undo).
+     * Undo : restaure l'état précédent.
      */
     public void undo() {
         PerspectiveMemento m = gestionnaireMemento.undo();
@@ -73,49 +75,66 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     }
 
     /**
-     * Réapplique la modification annulée (Redo).
+     * Redo : réapplique l'action annulée.
      */
     public void redo() {
         PerspectiveMemento m = gestionnaireMemento.redo();
         if (m != null) restaurerDepuisMemento(m);
     }
 
-    // ----------- Getters / Setters avec sauvegarde automatique -------------
+    // ================== GETTERS ==================
 
-    public double getZoom() {
-        return zoom;
-    }
+    public double getZoom() { return zoom; }
+    public double getCentreX() { return x; }
+    public double getCentreY() { return y; }
+    public String getCheminImage() { return cheminImage; }
 
+    // ================== SETTERS OPTIMISÉS ==================
+
+    /**
+     * Modifie le zoom avec sauvegarde automatique (Memento).
+     */
     public void setZoom(double zoom) {
+        gestionnaireMemento.sauvegarder(creerMemento());
         this.zoom = zoom;
-        gestionnaireMemento.sauvegarder(creerMemento()); // Auto-save
         notifier();
     }
 
-    public double getCentreX() {
-        return x;
-    }
-
-    public double getCentreY() {
-        return y;
-    }
-
+    /**
+     * Définit la position complète du centre.
+     * Utilisé comme méthode principale pour la cohérence.
+     */
     public void setCentre(double x, double y) {
-        gestionnaireMemento.sauvegarder(creerMemento()); // Auto-save
+        gestionnaireMemento.sauvegarder(creerMemento());
         this.x = x;
         this.y = y;
         notifier();
     }
 
-    public String getCheminImage() {
-        return cheminImage;
+    /**
+     * Modifie seulement X avec cohérence (passe par setCentre).
+     */
+    public void setCentreX(double x) {
+        setCentre(x, this.y);
     }
 
+    /**
+     * Modifie seulement Y avec cohérence (passe par setCentre).
+     */
+    public void setCentreY(double y) {
+        setCentre(this.x, y);
+    }
+
+    /**
+     * Définit le chemin vers l'image associée.
+     */
     public void setCheminImage(String cheminImage) {
-        gestionnaireMemento.sauvegarder(creerMemento()); // Auto-save
+        gestionnaireMemento.sauvegarder(creerMemento());
         this.cheminImage = cheminImage;
         notifier();
     }
+
+    // ================== MÉTHODES COMPOSITE ==================
 
     @Override
     public void afficher() {
@@ -125,19 +144,22 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
 
     @Override
     public void ajouter(PerspectiveComponent p) {
-        System.out.println("Impossible d’ajouter à une feuille.");
+        System.out.println("Impossible d’ajouter un enfant à une feuille.");
     }
 
     @Override
     public void supprimer(PerspectiveComponent p) {
-        // Rien à faire pour une leaf
+        // Aucun enfant dans une feuille
     }
 
     @Override
     public List<PerspectiveComponent> getEnfants() {
-        return List.of();
+        return List.of(); // Feuille = pas d'enfants
     }
 
+    /**
+     * Accès au gestionnaire de Memento pour les opérations externes si nécessaire.
+     */
     public GestionnaireMemento getMementoManager() {
         return gestionnaireMemento;
     }

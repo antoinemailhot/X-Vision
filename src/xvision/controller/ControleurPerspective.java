@@ -4,19 +4,16 @@ import xvision.model.*;
 
 /**
  * Contrôleur principal pour les perspectives (Principe GRASP: Controller)
- * Gère les actions utilisateur et délègue aux commandes appropriées
- * Principe GRASP: Low Coupling - Utilise le patron Command pour modifier le modèle
- *
- * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 1.0
+ * Gère les actions utilisateur et délègue aux commandes appropriées.
+ * Patron Command : toute modification passe par une commande (Undo/Redo).
  */
 public class ControleurPerspective {
+
     private GestionnaireDePerspectives gestionnaire;
     private GestionnaireCommandes gestionnaireCommandes;
 
     /**
-     * Constructeur du contrôleur
-     * @param gestionnaire Le gestionnaire de perspectives
+     * Constructeur
      */
     public ControleurPerspective(GestionnaireDePerspectives gestionnaire) {
         this.gestionnaire = gestionnaire;
@@ -24,22 +21,14 @@ public class ControleurPerspective {
     }
 
     /**
-     * Crée une nouvelle perspective
-     * Principe GRASP: Creator - Délègue au gestionnaire
-     * @param zoom Niveau de zoom initial
-     * @param x Position X initiale
-     * @param y Position Y initiale
-     * @return La perspective créée
+     * Crée une perspective simple.
      */
     public PerspectiveLeaf creerPerspective(double zoom, double x, double y) {
         return gestionnaire.ajouterPerspectiveSimple(zoom, x, y);
     }
 
     /**
-     * Modifie le zoom d'une perspective via une commande
-     * Patron Command: Toute modification passe par une commande (support Undo/Redo)
-     * @param perspective La perspective à modifier
-     * @param nouveauZoom Le nouveau niveau de zoom
+     * Modifie le zoom via une commande (Undo/Redo).
      */
     public void zoomer(PerspectiveLeaf perspective, double nouveauZoom) {
         Commande cmd = new CommandeZoom(perspective, nouveauZoom);
@@ -47,53 +36,38 @@ public class ControleurPerspective {
     }
 
     /**
-     * Déplace une perspective via une commande
-     * Patron Command: Toute modification passe par une commande (support Undo/Redo)
-     * @param perspective La perspective à déplacer
-     * @param x Nouvelle position X
-     * @param y Nouvelle position Y
+     * Applique un facteur multiplicatif au zoom.
      */
-    public void deplacer(PerspectiveLeaf perspective, double x, double y) {
-        Commande cmd = new CommandeTranslation(perspective, x, y);
+    public void zoomerAvecFacteur(PerspectiveLeaf perspective, double facteurMultiplicatif) {
+        double zoomActuel = perspective.getZoom();
+        double nouveauZoom = zoomActuel * facteurMultiplicatif;
+
+        nouveauZoom = Math.max(0.1, Math.min(nouveauZoom, 10.0));
+
+        zoomer(perspective, nouveauZoom);
+    }
+
+    /**
+     * Déplace la perspective vers une nouvelle position absolue.
+     */
+    public void deplacer(PerspectiveLeaf perspective, double dx, double dy) {
+        double newX = perspective.getCentreX() + dx;
+        double newY = perspective.getCentreY() + dy;
+
+        Commande cmd = new CommandeTranslation(perspective, newX, newY);
         gestionnaireCommandes.executerCommande(cmd);
     }
 
     /**
-     * Annule la dernière commande (Undo)
+     * Déplacement relatif très fluide (utilisé pendant l’inertie).
+     * Sans commande → plus performant, pas de spam d'Undo.
      */
-    public void annulerDerniereAction() {
-        gestionnaireCommandes.undo();
+    public void deplacerDelta(PerspectiveLeaf perspective, double dx, double dy) {
+        perspective.setCentreX(perspective.getCentreX() + dx);
+        perspective.setCentreY(perspective.getCentreY() + dy);
     }
 
-    /**
-     * Refait la dernière commande annulée (Redo)
-     */
-    public void refaireDerniereAction() {
-        gestionnaireCommandes.redo();
-    }
-
-    /**
-     * Affiche toutes les perspectives
-     * Simple délégation au gestionnaire
-     */
-    public void afficherToutes() {
-        gestionnaire.afficherToutes();
-    }
-
-    /**
-     * Retourne le gestionnaire de perspectives
-     * @return Le gestionnaire de perspectives
-     */
-    public GestionnaireDePerspectives getGestionnaire() {
-        return gestionnaire;
-    }
-
-    public void zoomerAvecFacteur(PerspectiveLeaf perspective, double facteurMultiplicatif) {
-    double zoomActuel = perspective.getZoom();
-    double nouveauZoom = zoomActuel * facteurMultiplicatif;
-    // limiter entre 0.1 et 10
-    nouveauZoom = Math.max(0.1, Math.min(nouveauZoom, 10.0));
-    perspective.setZoom(nouveauZoom);
-}
-
+    public void annulerDerniereAction() { gestionnaireCommandes.undo(); }
+    public void refaireDerniereAction() { gestionnaireCommandes.redo(); }
+    public GestionnaireDePerspectives getGestionnaire() { return gestionnaire; }
 }
