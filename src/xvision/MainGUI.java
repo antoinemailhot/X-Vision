@@ -1,9 +1,17 @@
 package xvision;
 
 import xvision.model.GestionnaireDePerspectives;
+import xvision.model.GestionnaireAnnotations;
+import xvision.model.GestionnaireCrop;
 import xvision.model.PerspectiveLeaf;
 import xvision.controller.ControleurPerspective;
+import xvision.controller.GestionnaireOutils;
+import xvision.controller.ContexteMode;
+import xvision.controller.ModeLigne;
+import xvision.controller.ModeCrop;
+import xvision.controller.GestionnaireCommandes;
 import xvision.view.MinimapOverlay;
+import xvision.view.VueAnnotations;
 import xvision.view.ObserverIF;
 
 import javax.swing.*;
@@ -16,35 +24,40 @@ import java.io.IOException;
 
 /**
  * Point d'entrée principal de l'application X-Vision
- * Architecture MVC stricte avec vue intégrée
+ * Architecture MVC stricte avec split vertical (navigation + annotations)
  * Patron Observer (GoF): Observe la PerspectiveLeaf active
  * Principe GRASP: High Cohesion - centralise l'affichage et les contrôles
  *
  * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 2.0
+ * @version 3.0
  */
 public class MainGUI extends JFrame implements ObserverIF {
 
     private PerspectiveLeaf perspective;
     private ControleurPerspective controleur;
+    private GestionnaireAnnotations gestionnaireAnnotations;
+    private GestionnaireCrop gestionnaireCrop;
+    private GestionnaireOutils gestionnaireOutils;
+    private ContexteMode contexte;
 
     private JLabel labelZoom, labelPos, labelImage;
-    private JPanel panelImage;
+    private JPanel panelNavigation;
+    private VueAnnotations vuePreview;
     private BufferedImage imageChargee;
-    private String cheminImageCache; // Cache du chemin pour éviter rechargements
+    private String cheminImageCache;
     private MinimapOverlay minimap;
 
-    private int lastMouseX, lastMouseY;
-    private double vx = 0;
-    private double vy = 0;
-    private Timer inertieTimer;
+    private JToggleButton btnOutilLigne;
+    private JToggleButton btnOutilCrop;
 
     /**
-     * Constructeur - initialise le modèle, le contrôleur et la vue
+     * Constructeur - initialise le modèle, le contrôleur et les vues
      */
     public MainGUI() {
         GestionnaireDePerspectives gestionnaire = new GestionnaireDePerspectives();
         controleur = new ControleurPerspective(gestionnaire);
+        gestionnaireAnnotations = new GestionnaireAnnotations();
+        gestionnaireCrop = new GestionnaireCrop();
 
         perspective = controleur.creerPerspective(1.0, 0, 0);
         String cheminImageDefaut = "resources/test_images/NewYorkcityMap.png";
@@ -57,35 +70,39 @@ public class MainGUI extends JFrame implements ObserverIF {
 
         perspective.attacher(this);
 
-        setTitle("X-Vision - Viewer d'Images");
-        setSize(1200, 800);
+        setTitle("X-Vision - Viewer & Annotations");
+        setSize(1400, 900);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel panelControle = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        panelControle.setBorder(BorderFactory.createTitledBorder("Contrôles"));
-        add(panelControle, BorderLayout.NORTH);
+        creerPanelNavigation();
+        creerVueAnnotations();
+        creerToolbar();
+        configurerRaccourcis();
 
-        JPanel panelInfo = new JPanel(new GridLayout(3, 1));
-        labelZoom = new JLabel();
-        labelPos = new JLabel();
-        labelImage = new JLabel();
-        panelInfo.add(labelZoom);
-        panelInfo.add(labelPos);
-        panelInfo.add(labelImage);
-        panelControle.add(panelInfo);
+        contexte = new ContexteMode(perspective, controleur, gestionnaireAnnotations, gestionnaireCrop);
 
-        JButton btnChargerImage = new JButton("Charger Image");
-        JButton btnUndo = new JButton("Undo");
-        JButton btnRedo = new JButton("Redo");
+        if (vuePreview != null) {
+            contexte.setVueAnnotations(vuePreview);
+        }
 
-        panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-        panelControle.add(btnChargerImage);
-        panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-        panelControle.add(btnUndo);
-        panelControle.add(btnRedo);
+        gestionnaireOutils = new GestionnaireOutils(panelNavigation, contexte);
 
-        panelImage = new JPanel() {
+        if (vuePreview != null) {
+            vuePreview.setGestionnaireOutils(gestionnaireOutils);
+            vuePreview.actualiser(); // Forcer le chargement initial de l'image
+        }
+
+        add(panelNavigation, BorderLayout.CENTER);
+
+        actualiser();
+    }
+
+    /**
+     * Crée le panel de navigation avec annotations
+     */
+    private void creerPanelNavigation() {
+        panelNavigation = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -94,6 +111,8 @@ public class MainGUI extends JFrame implements ObserverIF {
                     Graphics2D g2d = (Graphics2D) g;
                     g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
                                          RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                         RenderingHints.VALUE_ANTIALIAS_ON);
 
                     double zoom = perspective.getZoom();
                     int largeur = (int)(imageChargee.getWidth() * zoom);
@@ -103,66 +122,116 @@ public class MainGUI extends JFrame implements ObserverIF {
                     int y = (int)((getHeight() - hauteur)/2 + perspective.getCentreY());
 
                     g2d.drawImage(imageChargee, x, y, largeur, hauteur, this);
+
+                    // Appliquer transformation pour dessiner en coordonnées image
+                    Graphics2D g2dTransformed = (Graphics2D) g2d.create();
+                    g2dTransformed.translate(x, y);
+                    g2dTransformed.scale(zoom, zoom);
+
+                    if (gestionnaireAnnotations != null) {
+                        for (xvision.model.Annotation annotation : gestionnaireAnnotations.getAnnotations()) {
+                            annotation.dessiner(g2dTransformed);
+                        }
+                    }
+
+                    if (gestionnaireOutils != null && gestionnaireOutils.getModeLigne() != null) {
+                        xvision.model.Annotation preview = gestionnaireOutils.getModeLigne().getOutil().getAnnotationPreview();
+                        if (preview != null) {
+                            preview.dessiner(g2dTransformed);
+                        }
+                    }
+
+                    if (gestionnaireCrop != null && gestionnaireCrop.hasCrop()) {
+                        Rectangle cropRect = gestionnaireCrop.getZoneCrop();
+                        g2dTransformed.setColor(Color.RED);
+                        g2dTransformed.setStroke(new BasicStroke(4));
+                        g2dTransformed.drawRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+                    }
+
+                    if (gestionnaireOutils != null && gestionnaireOutils.getModeCrop() != null) {
+                        Rectangle previewRect = gestionnaireOutils.getModeCrop().getOutil().getRectanglePreview();
+                        if (previewRect != null) {
+                            g2dTransformed.setColor(new Color(255, 0, 0, 100));
+                            g2dTransformed.setStroke(new BasicStroke(4));
+                            g2dTransformed.drawRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
+                        }
+                    }
+
+                    g2dTransformed.dispose();
                 }
             }
         };
 
-        panelImage.setBackground(Color.DARK_GRAY);
-        panelImage.setLayout(null);
-        add(panelImage, BorderLayout.CENTER);
+        panelNavigation.setBackground(Color.DARK_GRAY);
+        panelNavigation.setLayout(null);
 
-        minimap = new MinimapOverlay(perspective, controleur, panelImage);
-        panelImage.add(minimap);
+        minimap = new MinimapOverlay(perspective, controleur, panelNavigation);
+        panelNavigation.add(minimap);
 
-        panelImage.addComponentListener(new ComponentAdapter() {
+        panelNavigation.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
                 positionnerMinimap();
             }
         });
 
-        panelImage.addMouseWheelListener(e -> {
+        panelNavigation.addMouseWheelListener(e -> {
             if (perspective != null) {
                 double facteur = Math.pow(1.1, -e.getWheelRotation());
                 controleur.zoomerAvecFacteur(perspective, facteur);
             }
         });
+    }
 
-        panelImage.addMouseListener(new MouseAdapter() {
+    /**
+     * Crée la vue preview (en haut à droite)
+     */
+    private void creerVueAnnotations() {
+        vuePreview = new VueAnnotations(perspective, gestionnaireAnnotations, gestionnaireCrop);
+        panelNavigation.add(vuePreview);
+
+        panelNavigation.addComponentListener(new ComponentAdapter() {
             @Override
-            public void mousePressed(MouseEvent e) {
-                lastMouseX = e.getX();
-                lastMouseY = e.getY();
-
-                if (inertieTimer != null && inertieTimer.isRunning()) {
-                    inertieTimer.stop();
-                }
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                lancerInertie();
+            public void componentResized(ComponentEvent e) {
+                positionnerOverlays();
             }
         });
+    }
 
-        panelImage.addMouseMotionListener(new MouseMotionAdapter() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-                int dx = e.getX() - lastMouseX;
-                int dy = e.getY() - lastMouseY;
+    /**
+     * Positionne les overlays (minimap + preview)
+     */
+    private void positionnerOverlays() {
+        positionnerMinimap();
 
-                vx = dx;
-                vy = dy;
+        if (vuePreview != null && panelNavigation != null) {
+            int margin = 15;
+            int x = panelNavigation.getWidth() - vuePreview.getPreferredSize().width - margin;
+            int y = margin;
+            vuePreview.setBounds(x, y, vuePreview.getPreferredSize().width,
+                                    vuePreview.getPreferredSize().height);
+        }
+    }
 
-                controleur.deplacerDelta(perspective, dx, dy);
+    /**
+     * Crée la toolbar verticale à droite
+     */
+    private void creerToolbar() {
+        JPanel toolbar = new JPanel();
+        toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.Y_AXIS));
+        toolbar.setBorder(BorderFactory.createTitledBorder("Outils"));
 
-                lastMouseX = e.getX();
-                lastMouseY = e.getY();
+        labelZoom = new JLabel("Zoom: 1.00");
+        labelPos = new JLabel("Pos: (0, 0)");
+        labelImage = new JLabel("Image: -");
 
-                panelImage.repaint();
-            }
-        });
+        toolbar.add(labelZoom);
+        toolbar.add(labelPos);
+        toolbar.add(labelImage);
+        toolbar.add(Box.createVerticalStrut(10));
 
+        JButton btnChargerImage = new JButton("Charger Image");
+        btnChargerImage.setMaximumSize(new Dimension(150, 30));
         btnChargerImage.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setCurrentDirectory(new File("resources/test_images"));
@@ -176,22 +245,75 @@ public class MainGUI extends JFrame implements ObserverIF {
                 perspective.setCheminImage(selectedFile.getAbsolutePath());
             }
         });
+        toolbar.add(btnChargerImage);
+        toolbar.add(Box.createVerticalStrut(10));
 
-        btnUndo.addActionListener(e -> {
-            if (perspective != null) perspective.undo();
+        btnOutilCrop = new JToggleButton("Outil Crop");
+        btnOutilCrop.setMaximumSize(new Dimension(150, 30));
+
+        btnOutilLigne = new JToggleButton("Outil Ligne");
+        btnOutilLigne.setMaximumSize(new Dimension(150, 30));
+
+        ButtonGroup groupOutils = new ButtonGroup();
+        groupOutils.add(btnOutilCrop);
+        groupOutils.add(btnOutilLigne);
+
+        btnOutilCrop.addActionListener(e -> {
+            if (btnOutilCrop.isSelected()) {
+                activerOutilCrop();
+            } else {
+                desactiverOutilCrop();
+            }
         });
 
-        btnRedo.addActionListener(e -> {
-            if (perspective != null) perspective.redo();
+        btnOutilLigne.addActionListener(e -> {
+            if (btnOutilLigne.isSelected()) {
+                activerOutilLigne();
+            } else {
+                desactiverOutilLigne();
+            }
         });
 
+        toolbar.add(btnOutilCrop);
+        toolbar.add(Box.createVerticalStrut(5));
+        toolbar.add(btnOutilLigne);
+        toolbar.add(Box.createVerticalStrut(10));
+
+        JButton btnUndo = new JButton("Undo (Ctrl+Z)");
+        btnUndo.setMaximumSize(new Dimension(150, 30));
+        btnUndo.addActionListener(e -> GestionnaireCommandes.getInstance().undo());
+        toolbar.add(btnUndo);
+
+        JButton btnRedo = new JButton("Redo (Ctrl+Y)");
+        btnRedo.setMaximumSize(new Dimension(150, 30));
+        btnRedo.addActionListener(e -> GestionnaireCommandes.getInstance().redo());
+        toolbar.add(btnRedo);
+
+        toolbar.add(Box.createVerticalStrut(10));
+
+        JButton btnEffacerAnnotations = new JButton("Effacer tout");
+        btnEffacerAnnotations.setMaximumSize(new Dimension(150, 30));
+        btnEffacerAnnotations.addActionListener(e -> {
+            gestionnaireAnnotations.effacerTout();
+        });
+        toolbar.add(btnEffacerAnnotations);
+
+        toolbar.add(Box.createVerticalGlue());
+
+        add(toolbar, BorderLayout.EAST);
+    }
+
+    /**
+     * Configure les raccourcis clavier
+     */
+    private void configurerRaccourcis() {
         int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
 
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
         getRootPane().getActionMap().put("undo", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (perspective != null) perspective.undo();
+                GestionnaireCommandes.getInstance().undo();
             }
         });
 
@@ -199,43 +321,20 @@ public class MainGUI extends JFrame implements ObserverIF {
                 .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
         getRootPane().getActionMap().put("redo", new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (perspective != null) perspective.redo();
+                GestionnaireCommandes.getInstance().redo();
             }
         });
-
-        actualiser();
     }
 
-    /**
-     * Lance l'inertie après relâchement de la souris
-     */
-    private void lancerInertie() {
-        double friction = 0.90;
-
-        inertieTimer = new Timer(16, e -> {
-            vx *= friction;
-            vy *= friction;
-
-            if (Math.abs(vx) < 0.1 && Math.abs(vy) < 0.1) {
-                inertieTimer.stop();
-                return;
-            }
-
-            controleur.deplacerDelta(perspective, vx, vy);
-            panelImage.repaint();
-        });
-
-        inertieTimer.start();
-    }
 
     /**
      * Positionne la minimap en bas à droite
      */
     private void positionnerMinimap() {
-        if (minimap != null && panelImage != null) {
+        if (minimap != null && panelNavigation != null) {
             int margin = 15;
-            int x = panelImage.getWidth() - minimap.getPreferredSize().width - margin;
-            int y = panelImage.getHeight() - minimap.getPreferredSize().height - margin;
+            int x = panelNavigation.getWidth() - minimap.getPreferredSize().width - margin;
+            int y = panelNavigation.getHeight() - minimap.getPreferredSize().height - margin;
             minimap.setBounds(x, y, minimap.getPreferredSize().width, minimap.getPreferredSize().height);
         }
     }
@@ -262,19 +361,65 @@ public class MainGUI extends JFrame implements ObserverIF {
                 imageChargee = ImageIO.read(new File(path));
                 cheminImageCache = path;
                 labelImage.setText("Image: " + new File(path).getName());
+
+                if (contexte != null) {
+                    contexte.setImageChargee(imageChargee);
+                }
             } catch (IOException e) {
                 imageChargee = null;
                 cheminImageCache = null;
                 labelImage.setText("Image: Erreur de chargement");
+
+                if (contexte != null) {
+                    contexte.setImageChargee(null);
+                }
             }
         } else if (path == null || path.isEmpty()) {
             imageChargee = null;
             cheminImageCache = null;
             labelImage.setText("Image: Aucune");
+
+            if (contexte != null) {
+                contexte.setImageChargee(null);
+            }
         }
 
-        panelImage.repaint();
-        positionnerMinimap();
+        panelNavigation.repaint();
+        positionnerOverlays();
+    }
+
+    /**
+     * Active l'outil ligne
+     */
+    private void activerOutilLigne() {
+        gestionnaireOutils.activerModeLigne(Color.RED, 3);
+        System.out.println("[MainGUI] Outil ligne activé");
+    }
+
+    /**
+     * Désactive l'outil ligne et revient à la navigation
+     */
+    private void desactiverOutilLigne() {
+        gestionnaireOutils.activerModeNavigation();
+        btnOutilLigne.setSelected(false);
+        System.out.println("[MainGUI] Outil ligne désactivé");
+    }
+
+    /**
+     * Active l'outil crop
+     */
+    private void activerOutilCrop() {
+        gestionnaireOutils.activerModeCrop();
+        System.out.println("[MainGUI] Outil crop activé");
+    }
+
+    /**
+     * Désactive l'outil crop et revient à la navigation
+     */
+    private void desactiverOutilCrop() {
+        gestionnaireOutils.activerModeNavigation();
+        btnOutilCrop.setSelected(false);
+        System.out.println("[MainGUI] Outil crop désactivé");
     }
 
     public static void main(String[] args) {
