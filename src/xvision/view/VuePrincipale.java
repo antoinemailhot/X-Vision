@@ -14,6 +14,10 @@ import java.io.IOException;
 /**
  * Vue principale affichant la perspective active.
  * Déplacement fluide avec inertie.
+ * Inclut une minimap en overlay en bas à droite (patron Observer)
+ *
+ * @author Antoine Mailhot & Micaël Racine-Leblanc
+ * @version 2.0
  */
 public class VuePrincipale extends JFrame implements ObserverIF {
 
@@ -23,6 +27,9 @@ public class VuePrincipale extends JFrame implements ObserverIF {
     private JLabel labelZoom, labelPos, labelImage;
     private JPanel panelImage;
     private BufferedImage imageChargee;
+
+    // Minimap overlay style Google Maps
+    private MinimapOverlay minimap;
 
     // --- Variables pour déplacement + inertie ---
     private int lastMouseX, lastMouseY;
@@ -79,7 +86,21 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         };
 
         panelImage.setBackground(Color.WHITE);
+        panelImage.setLayout(null); // Layout absolu pour positionner la minimap
         add(panelImage, BorderLayout.CENTER);
+
+        // ===================== MINIMAP OVERLAY =======================
+        // Créer la minimap (patron Observer - s'attache automatiquement)
+        minimap = new MinimapOverlay(perspective, controleur, panelImage);
+        panelImage.add(minimap);
+
+        // Positionner la minimap en bas à droite
+        panelImage.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                positionnerMinimap();
+            }
+        });
 
         // ===================== ZOOM ==========================
         panelImage.addMouseWheelListener(e -> {
@@ -176,6 +197,18 @@ public class VuePrincipale extends JFrame implements ObserverIF {
     }
 
     /**
+     * Positionne la minimap en bas à droite
+     */
+    private void positionnerMinimap() {
+        if (minimap != null && panelImage != null) {
+            int margin = 15;
+            int x = panelImage.getWidth() - minimap.getPreferredSize().width - margin;
+            int y = panelImage.getHeight() - minimap.getPreferredSize().height - margin;
+            minimap.setBounds(x, y, minimap.getPreferredSize().width, minimap.getPreferredSize().height);
+        }
+    }
+
+    /**
      * Mise à jour Observer
      */
     @Override
@@ -202,12 +235,19 @@ public class VuePrincipale extends JFrame implements ObserverIF {
         }
 
         panelImage.repaint();
+        positionnerMinimap(); // Repositionner la minimap si la fenêtre a changé
     }
 
     public void setPerspective(PerspectiveLeaf p) {
         if (this.perspective != null) this.perspective.detacher(this);
         this.perspective = p;
         if (p != null) p.attacher(this);
+
+        // Mettre à jour la minimap aussi
+        if (minimap != null) {
+            minimap.setPerspective(p);
+        }
+
         actualiser();
     }
 }

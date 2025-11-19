@@ -2,205 +2,285 @@ package xvision;
 
 import xvision.model.GestionnaireDePerspectives;
 import xvision.model.PerspectiveLeaf;
-import xvision.view.VuePrincipale;
-import xvision.view.Vignette;
 import xvision.controller.ControleurPerspective;
+import xvision.view.MinimapOverlay;
+import xvision.view.ObserverIF;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import java.io.File;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.HashMap;
+import java.io.IOException;
 
 /**
  * Point d'entrée principal de l'application X-Vision
- * Architecture MVC stricte: initialise le modèle, les vues et le contrôleur
+ * Architecture MVC stricte avec vue intégrée
+ * Patron Observer (GoF): Observe la PerspectiveLeaf active
+ * Principe GRASP: High Cohesion - centralise l'affichage et les contrôles
+ *
+ * @author Antoine Mailhot & Micaël Racine-Leblanc
+ * @version 2.0
  */
-public class MainGUI {
+public class MainGUI extends JFrame implements ObserverIF {
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
+    private PerspectiveLeaf perspective;
+    private ControleurPerspective controleur;
 
-            // ===== MODÈLE =====
-            GestionnaireDePerspectives gestionnaire = new GestionnaireDePerspectives();
+    private JLabel labelZoom, labelPos, labelImage;
+    private JPanel panelImage;
+    private BufferedImage imageChargee;
+    private String cheminImageCache; // Cache du chemin pour éviter rechargements
+    private MinimapOverlay minimap;
 
-            // ===== CONTRÔLEUR =====
-            ControleurPerspective controleur = new ControleurPerspective(gestionnaire);
+    private int lastMouseX, lastMouseY;
+    private double vx = 0;
+    private double vy = 0;
+    private Timer inertieTimer;
 
-            // ===== INTERFACE PRINCIPALE =====
-            JFrame frame = new JFrame("X-Vision - Démo Observer + MVC");
-            frame.setSize(900, 600);
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setLayout(new BorderLayout(10, 10));
+    /**
+     * Constructeur - initialise le modèle, le contrôleur et la vue
+     */
+    public MainGUI() {
+        GestionnaireDePerspectives gestionnaire = new GestionnaireDePerspectives();
+        controleur = new ControleurPerspective(gestionnaire);
 
-            // Panneau de contrôle
-            JPanel panelControle = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-            panelControle.setBorder(BorderFactory.createTitledBorder("Contrôles"));
-            frame.add(panelControle, BorderLayout.NORTH);
+        perspective = controleur.creerPerspective(1.0, 0, 0);
+        String cheminImageDefaut = "resources/test_images/NewYorkcityMap.png";
+        File imageDefaut = new File(cheminImageDefaut);
+        if (imageDefaut.exists()) {
+            perspective.setCheminImage(imageDefaut.getAbsolutePath());
+        } else {
+            System.err.println("[MainGUI] Image par défaut introuvable: " + cheminImageDefaut);
+        }
 
-            // Panneau principal pour les vues
-            JPanel panelVues = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
-            panelVues.setBorder(BorderFactory.createTitledBorder("Vues (Observateurs)"));
-            frame.add(panelVues, BorderLayout.CENTER);
+        perspective.attacher(this);
 
-            // ===== BOUTONS =====
-            JButton btnCreer = new JButton("Créer Perspective");
-            JButton btnOuvrir = new JButton("Ouvrir fenêtre");
-            JButton btnChargerImage = new JButton("Charger Image");
-            JButton btnZoom = new JButton("Modifier Zoom");
-            JButton btnDeplacer = new JButton("Déplacer");
-            JButton btnUndo = new JButton("Undo");
-            JButton btnRedo = new JButton("Redo");
+        setTitle("X-Vision - Viewer d'Images");
+        setSize(1200, 800);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
 
-            panelControle.add(new JLabel("Actions:"));
-            panelControle.add(btnCreer);
-            panelControle.add(btnOuvrir);
-            panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-            panelControle.add(btnChargerImage);
-            panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-            panelControle.add(btnZoom);
-            panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-            panelControle.add(btnDeplacer);
-            panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-            panelControle.add(btnUndo);
-            panelControle.add(new JSeparator(SwingConstants.VERTICAL));
-            panelControle.add(btnRedo);
+        JPanel panelControle = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
+        panelControle.setBorder(BorderFactory.createTitledBorder("Contrôles"));
+        add(panelControle, BorderLayout.NORTH);
 
-            // ===== REFERENCES =====
-            final PerspectiveLeaf[] perspectiveCourante = new PerspectiveLeaf[1];
-            final Map<PerspectiveLeaf, VuePrincipale> fenetresOuvertes = new HashMap<>();
-            List<PerspectiveLeaf> toutesPerspectives = new ArrayList<>();
+        JPanel panelInfo = new JPanel(new GridLayout(3, 1));
+        labelZoom = new JLabel();
+        labelPos = new JLabel();
+        labelImage = new JLabel();
+        panelInfo.add(labelZoom);
+        panelInfo.add(labelPos);
+        panelInfo.add(labelImage);
+        panelControle.add(panelInfo);
 
-            // ---- ACTIONS ----
-            btnCreer.addActionListener(e -> {
-                // Création de la perspective
-                PerspectiveLeaf perspective = controleur.creerPerspective(1.0, 0, 0);
-                perspectiveCourante[0] = perspective;
-                toutesPerspectives.add(perspective);
+        JButton btnChargerImage = new JButton("Charger Image");
+        JButton btnUndo = new JButton("Undo");
+        JButton btnRedo = new JButton("Redo");
 
-                // Créer la vignette
-                Vignette vignette = new Vignette(perspective);
-                panelVues.add(vignette);
-                panelVues.revalidate();
-                panelVues.repaint();
+        panelControle.add(new JSeparator(SwingConstants.VERTICAL));
+        panelControle.add(btnChargerImage);
+        panelControle.add(new JSeparator(SwingConstants.VERTICAL));
+        panelControle.add(btnUndo);
+        panelControle.add(btnRedo);
 
-                // Double-clic sur vignette pour ouvrir ou sélectionner la fenêtre
-                vignette.addMouseListener(new MouseAdapter() {
-                    @Override
-                    public void mouseClicked(MouseEvent me) {
-                        if (me.getClickCount() == 2) {
-                            ouvrirFenetrePerspective(perspective, fenetresOuvertes, controleur);
-                        } else {
-                            perspectiveCourante[0] = perspective;
-                        }
-                    }
-                });
+        panelImage = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
 
-                // ===== OUVERTURE AUTOMATIQUE =====
-                VuePrincipale vue = ouvrirFenetrePerspective(perspective, fenetresOuvertes, controleur);
-                vue.toFront();             
-                vue.requestFocus();        
-                perspectiveCourante[0] = perspective; 
+                if (imageChargee != null && perspective != null) {
+                    Graphics2D g2d = (Graphics2D) g;
+                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                         RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-                JOptionPane.showMessageDialog(frame,
-                        "Perspective créée avec 1 vignette!\nLa fenêtre a été ouverte et sélectionnée automatiquement.",
-                        "Succès", JOptionPane.INFORMATION_MESSAGE);
-            });
+                    double zoom = perspective.getZoom();
+                    int largeur = (int)(imageChargee.getWidth() * zoom);
+                    int hauteur = (int)(imageChargee.getHeight() * zoom);
 
-            btnOuvrir.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) {
-                    ouvrirFenetrePerspective(perspectiveCourante[0], fenetresOuvertes, controleur);
-                } else {
-                    JOptionPane.showMessageDialog(frame, "Créez ou sélectionnez d'abord une perspective!");
+                    int x = (int)((getWidth() - largeur)/2 + perspective.getCentreX());
+                    int y = (int)((getHeight() - hauteur)/2 + perspective.getCentreY());
+
+                    g2d.drawImage(imageChargee, x, y, largeur, hauteur, this);
                 }
-            });
+            }
+        };
 
-            btnChargerImage.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) {
-                    JFileChooser fileChooser = new JFileChooser();
-                    fileChooser.setCurrentDirectory(new File("ressources"));
-                    fileChooser.setDialogTitle("Sélectionner une image test");
-                    fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                            "Images", "jpg", "jpeg", "png", "gif", "bmp"));
+        panelImage.setBackground(Color.DARK_GRAY);
+        panelImage.setLayout(null);
+        add(panelImage, BorderLayout.CENTER);
 
-                    int result = fileChooser.showOpenDialog(frame);
-                    if (result == JFileChooser.APPROVE_OPTION) {
-                        File selectedFile = fileChooser.getSelectedFile();
-                        perspectiveCourante[0].setCheminImage(selectedFile.getAbsolutePath());
-                    }
-                }
-            });
+        minimap = new MinimapOverlay(perspective, controleur, panelImage);
+        panelImage.add(minimap);
 
-            btnZoom.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) {
-                    String input = JOptionPane.showInputDialog(frame, "Nouveau zoom:", "2.0");
-                    if (input != null) {
-                        double zoom = Double.parseDouble(input);
-                        controleur.zoomer(perspectiveCourante[0], zoom);
-                    }
-                }
-            });
-
-            btnDeplacer.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) {
-                    String inputX = JOptionPane.showInputDialog(frame, "Nouvelle position X:", "100");
-                    String inputY = JOptionPane.showInputDialog(frame, "Nouvelle position Y:", "50");
-                    if (inputX != null && inputY != null) {
-                        double x = Double.parseDouble(inputX);
-                        double y = Double.parseDouble(inputY);
-                        controleur.deplacer(perspectiveCourante[0], x, y);
-                    }
-                }
-            });
-
-            btnUndo.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) perspectiveCourante[0].undo();
-                else toutesPerspectives.forEach(PerspectiveLeaf::undo);
-            });
-
-            btnRedo.addActionListener(e -> {
-                if (perspectiveCourante[0] != null) perspectiveCourante[0].redo();
-                else toutesPerspectives.forEach(PerspectiveLeaf::redo);
-            });
-
-            // Clic sur le panneau principal pour désélectionner la perspective
-            panelVues.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    perspectiveCourante[0] = null;
-                }
-            });
-
-            frame.setVisible(true);
+        panelImage.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                positionnerMinimap();
+            }
         });
+
+        panelImage.addMouseWheelListener(e -> {
+            if (perspective != null) {
+                double facteur = Math.pow(1.1, -e.getWheelRotation());
+                controleur.zoomerAvecFacteur(perspective, facteur);
+            }
+        });
+
+        panelImage.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                lastMouseX = e.getX();
+                lastMouseY = e.getY();
+
+                if (inertieTimer != null && inertieTimer.isRunning()) {
+                    inertieTimer.stop();
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                lancerInertie();
+            }
+        });
+
+        panelImage.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                int dx = e.getX() - lastMouseX;
+                int dy = e.getY() - lastMouseY;
+
+                vx = dx;
+                vy = dy;
+
+                controleur.deplacerDelta(perspective, dx, dy);
+
+                lastMouseX = e.getX();
+                lastMouseY = e.getY();
+
+                panelImage.repaint();
+            }
+        });
+
+        btnChargerImage.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setCurrentDirectory(new File("resources/test_images"));
+            fileChooser.setDialogTitle("Sélectionner une image");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                    "Images", "jpg", "jpeg", "png", "gif", "bmp"));
+
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFile = fileChooser.getSelectedFile();
+                perspective.setCheminImage(selectedFile.getAbsolutePath());
+            }
+        });
+
+        btnUndo.addActionListener(e -> {
+            if (perspective != null) perspective.undo();
+        });
+
+        btnRedo.addActionListener(e -> {
+            if (perspective != null) perspective.redo();
+        });
+
+        int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
+        getRootPane().getActionMap().put("undo", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (perspective != null) perspective.undo();
+            }
+        });
+
+        getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
+        getRootPane().getActionMap().put("redo", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (perspective != null) perspective.redo();
+            }
+        });
+
+        actualiser();
     }
 
     /**
-     * Ouvre la fenêtre VuePrincipale pour la perspective donnée.
-     * Si elle existe déjà, la met en avant.
-     * Nécessite le contrôleur pour initialiser la vue.
+     * Lance l'inertie après relâchement de la souris
      */
-    private static VuePrincipale ouvrirFenetrePerspective(PerspectiveLeaf perspective,
-                                                          Map<PerspectiveLeaf, VuePrincipale> fenetres,
-                                                          ControleurPerspective controleur) {
-        if (fenetres.containsKey(perspective)) {
-            VuePrincipale vue = fenetres.get(perspective);
-            vue.toFront();
-            vue.requestFocus();
-            return vue;
-        } else {
-            VuePrincipale vue = new VuePrincipale(perspective, controleur);
-            fenetres.put(perspective, vue);
-            vue.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosed(WindowEvent e) {
-                    fenetres.remove(perspective);
-                }
-            });
-            return vue;
+    private void lancerInertie() {
+        double friction = 0.90;
+
+        inertieTimer = new Timer(16, e -> {
+            vx *= friction;
+            vy *= friction;
+
+            if (Math.abs(vx) < 0.1 && Math.abs(vy) < 0.1) {
+                inertieTimer.stop();
+                return;
+            }
+
+            controleur.deplacerDelta(perspective, vx, vy);
+            panelImage.repaint();
+        });
+
+        inertieTimer.start();
+    }
+
+    /**
+     * Positionne la minimap en bas à droite
+     */
+    private void positionnerMinimap() {
+        if (minimap != null && panelImage != null) {
+            int margin = 15;
+            int x = panelImage.getWidth() - minimap.getPreferredSize().width - margin;
+            int y = panelImage.getHeight() - minimap.getPreferredSize().height - margin;
+            minimap.setBounds(x, y, minimap.getPreferredSize().width, minimap.getPreferredSize().height);
         }
+    }
+
+    /**
+     * Mise à jour Observer (Patron Observer - GoF)
+     * Appelée automatiquement par le modèle quand il change
+     * Optimisation: charge l'image uniquement si le chemin a changé
+     */
+    @Override
+    public void actualiser() {
+        if (perspective == null) return;
+
+        labelZoom.setText("Zoom: " + String.format("%.2f", perspective.getZoom()));
+        labelPos.setText("Position: (" +
+                String.format("%.1f", perspective.getCentreX()) + ", " +
+                String.format("%.1f", perspective.getCentreY()) + ")");
+
+        String path = perspective.getCheminImage();
+
+        // Charger l'image SEULEMENT si le chemin a changé
+        if (path != null && !path.isEmpty() && !path.equals(cheminImageCache)) {
+            try {
+                imageChargee = ImageIO.read(new File(path));
+                cheminImageCache = path;
+                labelImage.setText("Image: " + new File(path).getName());
+            } catch (IOException e) {
+                imageChargee = null;
+                cheminImageCache = null;
+                labelImage.setText("Image: Erreur de chargement");
+            }
+        } else if (path == null || path.isEmpty()) {
+            imageChargee = null;
+            cheminImageCache = null;
+            labelImage.setText("Image: Aucune");
+        }
+
+        panelImage.repaint();
+        positionnerMinimap();
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            MainGUI app = new MainGUI();
+            app.setVisible(true);
+        });
     }
 }
