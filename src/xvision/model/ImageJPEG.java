@@ -20,7 +20,6 @@ import java.io.ByteArrayOutputStream;
 public class ImageJPEG {
 
     private BufferedImage imageJPEG;
-    private String cheminFichier;
     private float qualiteCompression = 0.85f; // Qualité par défaut
 
     /**
@@ -31,7 +30,6 @@ public class ImageJPEG {
      */
     public void chargerJPEG(String chemin) {
         try {
-            this.cheminFichier = chemin;
             this.imageJPEG = ImageIO.read(new File(chemin));
             System.out.println("[ImageJPEG] Image JPEG chargée: " + chemin);
             System.out.println("[ImageJPEG] Qualité de compression: " + (qualiteCompression * 100) + "%");

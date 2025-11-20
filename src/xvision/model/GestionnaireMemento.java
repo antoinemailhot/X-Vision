@@ -1,5 +1,7 @@
 package xvision.model;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 /**
@@ -55,7 +57,7 @@ public class GestionnaireMemento {
     }
 
     /**
-     * Fournit une copie de la pile Undo pour sérialisation (Save Prospect).
+     * Fournit une copie de la pile Undo pour sérialisation ou inspection.
      * @return Une copie immuable de la pile Undo.
      */
     public Stack<PerspectiveMemento> getPileUndoSnapshot() {
@@ -65,7 +67,7 @@ public class GestionnaireMemento {
     }   
 
     /**
-     * Fournit une copie de la pile Redo pour sérialisation (Save Prospect).
+     * Fournit une copie de la pile Redo pour sérialisation ou inspection.
      * @return Une copie immuable de la pile Redo.
      */
     public Stack<PerspectiveMemento> getPileRedoSnapshot() {
@@ -86,5 +88,22 @@ public class GestionnaireMemento {
         pileRedo.addAll(redo);
     }
 
+    /**
+     * Retourne l'historique complet des mementos (pile Undo).
+     * Utile pour la sérialisation dans la sauvegarde de perspective.
+     * @return Liste des mementos en ordre d'ajout.
+     */
+    public List<PerspectiveMemento> getHistorique() {
+        return new ArrayList<>(pileUndo); // copie défensive
+    }
 
+    /**
+     * Retourne l'historique complet combiné Undo + Redo (optionnel)
+     * @return Liste des mementos incluant les états annulés.
+     */
+    public List<PerspectiveMemento> getHistoriqueComplet() {
+        List<PerspectiveMemento> hist = new ArrayList<>(pileUndo);
+        hist.addAll(pileRedo);
+        return hist;
+    }
 }

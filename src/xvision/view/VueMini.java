@@ -2,7 +2,6 @@ package xvision.view;
 
 import javax.swing.*;
 import xvision.model.PerspectiveLeaf;
-import xvision.model.Sujet;
 
 /**
  * Vue miniature alternative d'une perspective

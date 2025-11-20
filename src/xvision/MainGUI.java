@@ -1,18 +1,8 @@
 package xvision;
 
-import xvision.model.GestionnaireDePerspectives;
-import xvision.model.GestionnaireAnnotations;
-import xvision.model.GestionnaireCrop;
-import xvision.model.PerspectiveLeaf;
-import xvision.controller.ControleurPerspective;
-import xvision.controller.GestionnaireOutils;
-import xvision.controller.ContexteMode;
-import xvision.controller.ModeLigne;
-import xvision.controller.ModeCrop;
-import xvision.controller.GestionnaireCommandes;
-import xvision.view.MinimapOverlay;
-import xvision.view.VueAnnotations;
-import xvision.view.ObserverIF;
+import xvision.model.*;
+import xvision.controller.*;
+import xvision.view.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -27,12 +17,10 @@ import java.io.IOException;
  * Architecture MVC stricte avec split vertical (navigation + annotations)
  * Patron Observer (GoF): Observe la PerspectiveLeaf active
  * Principe GRASP: High Cohesion - centralise l'affichage et les contrôles
- *
- * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 3.0
  */
 public class MainGUI extends JFrame implements ObserverIF {
 
+    private GestionnaireDePerspectives gestionnairePerspectives;
     private PerspectiveLeaf perspective;
     private ControleurPerspective controleur;
     private GestionnaireAnnotations gestionnaireAnnotations;
@@ -50,15 +38,14 @@ public class MainGUI extends JFrame implements ObserverIF {
     private JToggleButton btnOutilLigne;
     private JToggleButton btnOutilCrop;
 
-    /**
-     * Constructeur - initialise le modèle, le contrôleur et les vues
-     */
     public MainGUI() {
-        GestionnaireDePerspectives gestionnaire = new GestionnaireDePerspectives();
-        controleur = new ControleurPerspective(gestionnaire);
+        // Initialisation modèle / contrôleur
+        gestionnairePerspectives = new GestionnaireDePerspectives();
+        controleur = new ControleurPerspective(gestionnairePerspectives);
         gestionnaireAnnotations = new GestionnaireAnnotations();
         gestionnaireCrop = new GestionnaireCrop();
 
+        // Création perspective initiale
         perspective = controleur.creerPerspective(1.0, 0, 0);
         String cheminImageDefaut = "resources/test_images/NewYorkcityMap.png";
         File imageDefaut = new File(cheminImageDefaut);
@@ -67,7 +54,6 @@ public class MainGUI extends JFrame implements ObserverIF {
         } else {
             System.err.println("[MainGUI] Image par défaut introuvable: " + cheminImageDefaut);
         }
-
         perspective.attacher(this);
 
         setTitle("X-Vision - Viewer & Annotations");
@@ -81,84 +67,72 @@ public class MainGUI extends JFrame implements ObserverIF {
         configurerRaccourcis();
 
         contexte = new ContexteMode(perspective, controleur, gestionnaireAnnotations, gestionnaireCrop);
-
-        if (vuePreview != null) {
-            contexte.setVueAnnotations(vuePreview);
-        }
+        if (vuePreview != null) contexte.setVueAnnotations(vuePreview);
 
         gestionnaireOutils = new GestionnaireOutils(panelNavigation, contexte);
 
         if (vuePreview != null) {
             vuePreview.setGestionnaireOutils(gestionnaireOutils);
-            vuePreview.actualiser(); // Forcer le chargement initial de l'image
+            vuePreview.actualiser();
         }
 
         add(panelNavigation, BorderLayout.CENTER);
-
         actualiser();
     }
 
-    /**
-     * Crée le panel de navigation avec annotations
-     */
     private void creerPanelNavigation() {
         panelNavigation = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
+                if (imageChargee == null || perspective == null) return;
 
-                if (imageChargee != null && perspective != null) {
-                    Graphics2D g2d = (Graphics2D) g;
-                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                         RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                                         RenderingHints.VALUE_ANTIALIAS_ON);
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                     RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                     RenderingHints.VALUE_ANTIALIAS_ON);
 
-                    double zoom = perspective.getZoom();
-                    int largeur = (int)(imageChargee.getWidth() * zoom);
-                    int hauteur = (int)(imageChargee.getHeight() * zoom);
+                double zoom = perspective.getZoom();
+                int largeur = (int) (imageChargee.getWidth() * zoom);
+                int hauteur = (int) (imageChargee.getHeight() * zoom);
+                int x = (int) ((getWidth() - largeur) / 2 + perspective.getCentreX());
+                int y = (int) ((getHeight() - hauteur) / 2 + perspective.getCentreY());
 
-                    int x = (int)((getWidth() - largeur)/2 + perspective.getCentreX());
-                    int y = (int)((getHeight() - hauteur)/2 + perspective.getCentreY());
+                g2d.drawImage(imageChargee, x, y, largeur, hauteur, this);
 
-                    g2d.drawImage(imageChargee, x, y, largeur, hauteur, this);
+                Graphics2D g2dTransformed = (Graphics2D) g2d.create();
+                g2dTransformed.translate(x, y);
+                g2dTransformed.scale(zoom, zoom);
 
-                    // Appliquer transformation pour dessiner en coordonnées image
-                    Graphics2D g2dTransformed = (Graphics2D) g2d.create();
-                    g2dTransformed.translate(x, y);
-                    g2dTransformed.scale(zoom, zoom);
-
-                    if (gestionnaireAnnotations != null) {
-                        for (xvision.model.Annotation annotation : gestionnaireAnnotations.getAnnotations()) {
-                            annotation.dessiner(g2dTransformed);
-                        }
+                if (gestionnaireAnnotations != null) {
+                    for (Annotation annotation : gestionnaireAnnotations.getAnnotations()) {
+                        annotation.dessiner(g2dTransformed);
                     }
-
-                    if (gestionnaireOutils != null && gestionnaireOutils.getModeLigne() != null) {
-                        xvision.model.Annotation preview = gestionnaireOutils.getModeLigne().getOutil().getAnnotationPreview();
-                        if (preview != null) {
-                            preview.dessiner(g2dTransformed);
-                        }
-                    }
-
-                    if (gestionnaireCrop != null && gestionnaireCrop.hasCrop()) {
-                        Rectangle cropRect = gestionnaireCrop.getZoneCrop();
-                        g2dTransformed.setColor(Color.RED);
-                        g2dTransformed.setStroke(new BasicStroke(4));
-                        g2dTransformed.drawRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-                    }
-
-                    if (gestionnaireOutils != null && gestionnaireOutils.getModeCrop() != null) {
-                        Rectangle previewRect = gestionnaireOutils.getModeCrop().getOutil().getRectanglePreview();
-                        if (previewRect != null) {
-                            g2dTransformed.setColor(new Color(255, 0, 0, 100));
-                            g2dTransformed.setStroke(new BasicStroke(4));
-                            g2dTransformed.drawRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
-                        }
-                    }
-
-                    g2dTransformed.dispose();
                 }
+
+                if (gestionnaireOutils != null && gestionnaireOutils.getModeLigne() != null) {
+                    Annotation preview = gestionnaireOutils.getModeLigne().getOutil().getAnnotationPreview();
+                    if (preview != null) preview.dessiner(g2dTransformed);
+                }
+
+                if (gestionnaireCrop != null && gestionnaireCrop.hasCrop()) {
+                    Rectangle cropRect = gestionnaireCrop.getZoneCrop();
+                    g2dTransformed.setColor(Color.RED);
+                    g2dTransformed.setStroke(new BasicStroke(4));
+                    g2dTransformed.drawRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+                }
+
+                if (gestionnaireOutils != null && gestionnaireOutils.getModeCrop() != null) {
+                    Rectangle previewRect = gestionnaireOutils.getModeCrop().getOutil().getRectanglePreview();
+                    if (previewRect != null) {
+                        g2dTransformed.setColor(new Color(255, 0, 0, 100));
+                        g2dTransformed.setStroke(new BasicStroke(4));
+                        g2dTransformed.drawRect(previewRect.x, previewRect.y, previewRect.width, previewRect.height);
+                    }
+                }
+
+                g2dTransformed.dispose();
             }
         };
 
@@ -171,7 +145,7 @@ public class MainGUI extends JFrame implements ObserverIF {
         panelNavigation.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                positionnerMinimap();
+                positionnerOverlays();
             }
         });
 
@@ -183,39 +157,22 @@ public class MainGUI extends JFrame implements ObserverIF {
         });
     }
 
-    /**
-     * Crée la vue preview (en haut à droite)
-     */
     private void creerVueAnnotations() {
         vuePreview = new VueAnnotations(perspective, gestionnaireAnnotations, gestionnaireCrop);
         panelNavigation.add(vuePreview);
-
-        panelNavigation.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-                positionnerOverlays();
-            }
-        });
     }
 
-    /**
-     * Positionne les overlays (minimap + preview)
-     */
     private void positionnerOverlays() {
         positionnerMinimap();
-
         if (vuePreview != null && panelNavigation != null) {
             int margin = 15;
             int x = panelNavigation.getWidth() - vuePreview.getPreferredSize().width - margin;
             int y = margin;
             vuePreview.setBounds(x, y, vuePreview.getPreferredSize().width,
-                                    vuePreview.getPreferredSize().height);
+                    vuePreview.getPreferredSize().height);
         }
     }
 
-    /**
-     * Crée la toolbar verticale à droite
-     */
     private void creerToolbar() {
         JPanel toolbar = new JPanel();
         toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.Y_AXIS));
@@ -224,12 +181,12 @@ public class MainGUI extends JFrame implements ObserverIF {
         labelZoom = new JLabel("Zoom: 1.00");
         labelPos = new JLabel("Pos: (0, 0)");
         labelImage = new JLabel("Image: -");
-
         toolbar.add(labelZoom);
         toolbar.add(labelPos);
         toolbar.add(labelImage);
         toolbar.add(Box.createVerticalStrut(10));
 
+        // ----------------- Charger Image -----------------
         JButton btnChargerImage = new JButton("Charger Image");
         btnChargerImage.setMaximumSize(new Dimension(150, 30));
         btnChargerImage.addActionListener(e -> {
@@ -238,40 +195,67 @@ public class MainGUI extends JFrame implements ObserverIF {
             fileChooser.setDialogTitle("Sélectionner une image");
             fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
                     "Images", "jpg", "jpeg", "png", "gif", "bmp"));
-
             int result = fileChooser.showOpenDialog(this);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File selectedFile = fileChooser.getSelectedFile();
                 perspective.setCheminImage(selectedFile.getAbsolutePath());
+                actualiser();
             }
         });
         toolbar.add(btnChargerImage);
         toolbar.add(Box.createVerticalStrut(10));
 
+        // ----------------- Sauvegarder / Charger Perspective -----------------
+        JButton btnSauvegarderPerspective = new JButton("Sauvegarder Perspective");
+        btnSauvegarderPerspective.setMaximumSize(new Dimension(150, 30));
+        btnSauvegarderPerspective.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Sauvegarder la perspective");
+            int result = fileChooser.showSaveDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File fichier = fileChooser.getSelectedFile();
+                controleur.sauvegarderPerspectiveActuelle(fichier.getAbsolutePath());
+            }
+        });
+        toolbar.add(btnSauvegarderPerspective);
+        toolbar.add(Box.createVerticalStrut(5));
+
+        JButton btnChargerPerspective = new JButton("Charger Perspective");
+        btnChargerPerspective.setMaximumSize(new Dimension(150, 30));
+        btnChargerPerspective.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Charger une perspective");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("JSON", "json"));
+            int result = fileChooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File fichier = fileChooser.getSelectedFile();
+                PerspectiveLeaf p = controleur.chargerPerspective(fichier.getAbsolutePath());
+                if (p != null) {
+                    perspective = p;
+                    perspective.attacher(this);
+                    actualiser();
+                }
+            }
+        });
+        toolbar.add(btnChargerPerspective);
+        toolbar.add(Box.createVerticalStrut(10));
+
+        // ----------------- Outils ligne / crop -----------------
         btnOutilCrop = new JToggleButton("Outil Crop");
         btnOutilCrop.setMaximumSize(new Dimension(150, 30));
-
         btnOutilLigne = new JToggleButton("Outil Ligne");
         btnOutilLigne.setMaximumSize(new Dimension(150, 30));
-
         ButtonGroup groupOutils = new ButtonGroup();
         groupOutils.add(btnOutilCrop);
         groupOutils.add(btnOutilLigne);
 
         btnOutilCrop.addActionListener(e -> {
-            if (btnOutilCrop.isSelected()) {
-                activerOutilCrop();
-            } else {
-                desactiverOutilCrop();
-            }
+            if (btnOutilCrop.isSelected()) activerOutilCrop();
+            else desactiverOutilCrop();
         });
-
         btnOutilLigne.addActionListener(e -> {
-            if (btnOutilLigne.isSelected()) {
-                activerOutilLigne();
-            } else {
-                desactiverOutilLigne();
-            }
+            if (btnOutilLigne.isSelected()) activerOutilLigne();
+            else desactiverOutilLigne();
         });
 
         toolbar.add(btnOutilCrop);
@@ -279,6 +263,7 @@ public class MainGUI extends JFrame implements ObserverIF {
         toolbar.add(btnOutilLigne);
         toolbar.add(Box.createVerticalStrut(10));
 
+        // ----------------- Undo / Redo -----------------
         JButton btnUndo = new JButton("Undo (Ctrl+Z)");
         btnUndo.setMaximumSize(new Dimension(150, 30));
         btnUndo.addActionListener(e -> GestionnaireCommandes.getInstance().undo());
@@ -289,47 +274,33 @@ public class MainGUI extends JFrame implements ObserverIF {
         btnRedo.addActionListener(e -> GestionnaireCommandes.getInstance().redo());
         toolbar.add(btnRedo);
 
-        toolbar.add(Box.createVerticalStrut(10));
-
+        // ----------------- Effacer annotations -----------------
         JButton btnEffacerAnnotations = new JButton("Effacer tout");
         btnEffacerAnnotations.setMaximumSize(new Dimension(150, 30));
         btnEffacerAnnotations.addActionListener(e -> {
             gestionnaireAnnotations.effacerTout();
+            panelNavigation.repaint();
         });
         toolbar.add(btnEffacerAnnotations);
 
         toolbar.add(Box.createVerticalGlue());
-
         add(toolbar, BorderLayout.EAST);
     }
 
-    /**
-     * Configure les raccourcis clavier
-     */
     private void configurerRaccourcis() {
         int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
-
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
         getRootPane().getActionMap().put("undo", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                GestionnaireCommandes.getInstance().undo();
-            }
+            public void actionPerformed(ActionEvent e) { GestionnaireCommandes.getInstance().undo(); }
         });
-
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
         getRootPane().getActionMap().put("redo", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                GestionnaireCommandes.getInstance().redo();
-            }
+            public void actionPerformed(ActionEvent e) { GestionnaireCommandes.getInstance().redo(); }
         });
     }
 
-
-    /**
-     * Positionne la minimap en bas à droite
-     */
     private void positionnerMinimap() {
         if (minimap != null && panelNavigation != null) {
             int margin = 15;
@@ -339,87 +310,59 @@ public class MainGUI extends JFrame implements ObserverIF {
         }
     }
 
-    /**
-     * Mise à jour Observer (Patron Observer - GoF)
-     * Appelée automatiquement par le modèle quand il change
-     * Optimisation: charge l'image uniquement si le chemin a changé
-     */
     @Override
     public void actualiser() {
         if (perspective == null) return;
-
         labelZoom.setText("Zoom: " + String.format("%.2f", perspective.getZoom()));
-        labelPos.setText("Position: (" +
-                String.format("%.1f", perspective.getCentreX()) + ", " +
+        labelPos.setText("Position: (" + String.format("%.1f", perspective.getCentreX()) + ", " +
                 String.format("%.1f", perspective.getCentreY()) + ")");
-
         String path = perspective.getCheminImage();
-
-        // Charger l'image SEULEMENT si le chemin a changé
         if (path != null && !path.isEmpty() && !path.equals(cheminImageCache)) {
             try {
                 imageChargee = ImageIO.read(new File(path));
                 cheminImageCache = path;
                 labelImage.setText("Image: " + new File(path).getName());
-
-                if (contexte != null) {
-                    contexte.setImageChargee(imageChargee);
-                }
+                if (contexte != null) contexte.setImageChargee(imageChargee);
             } catch (IOException e) {
                 imageChargee = null;
                 cheminImageCache = null;
                 labelImage.setText("Image: Erreur de chargement");
-
-                if (contexte != null) {
-                    contexte.setImageChargee(null);
-                }
+                if (contexte != null) contexte.setImageChargee(null);
             }
         } else if (path == null || path.isEmpty()) {
             imageChargee = null;
             cheminImageCache = null;
             labelImage.setText("Image: Aucune");
-
-            if (contexte != null) {
-                contexte.setImageChargee(null);
-            }
+            if (contexte != null) contexte.setImageChargee(null);
         }
-
         panelNavigation.repaint();
         positionnerOverlays();
     }
 
-    /**
-     * Active l'outil ligne
-     */
     private void activerOutilLigne() {
         gestionnaireOutils.activerModeLigne(Color.RED, 3);
-        System.out.println("[MainGUI] Outil ligne activé");
+        panelNavigation.repaint();
+        if (vuePreview != null) vuePreview.actualiser();
     }
 
-    /**
-     * Désactive l'outil ligne et revient à la navigation
-     */
     private void desactiverOutilLigne() {
         gestionnaireOutils.activerModeNavigation();
         btnOutilLigne.setSelected(false);
-        System.out.println("[MainGUI] Outil ligne désactivé");
+        panelNavigation.repaint();
+        if (vuePreview != null) vuePreview.actualiser();
     }
 
-    /**
-     * Active l'outil crop
-     */
     private void activerOutilCrop() {
         gestionnaireOutils.activerModeCrop();
-        System.out.println("[MainGUI] Outil crop activé");
+        panelNavigation.repaint();
+        if (vuePreview != null) vuePreview.actualiser();
     }
 
-    /**
-     * Désactive l'outil crop et revient à la navigation
-     */
     private void desactiverOutilCrop() {
         gestionnaireOutils.activerModeNavigation();
         btnOutilCrop.setSelected(false);
-        System.out.println("[MainGUI] Outil crop désactivé");
+        panelNavigation.repaint();
+        if (vuePreview != null) vuePreview.actualiser();
     }
 
     public static void main(String[] args) {

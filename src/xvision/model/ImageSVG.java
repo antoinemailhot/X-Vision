@@ -21,7 +21,6 @@ import java.nio.file.Files;
 public class ImageSVG {
 
     private String contenuSVG;
-    private String cheminFichier;
     private int largeurRendu = 800;  // Largeur par défaut pour le rendu
     private int hauteurRendu = 600;  // Hauteur par défaut pour le rendu
 
@@ -33,7 +32,6 @@ public class ImageSVG {
      */
     public void chargerSVG(String chemin) {
         try {
-            this.cheminFichier = chemin;
             File fichier = new File(chemin);
             this.contenuSVG = Files.readString(fichier.toPath());
 

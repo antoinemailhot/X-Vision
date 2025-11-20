@@ -33,8 +33,6 @@ public class MinimapOverlay extends JPanel implements ObserverIF {
     // Dimensions de la minimap
     private static final int MINIMAP_WIDTH = 200;
     private static final int MINIMAP_HEIGHT = 150;
-    private static final int MARGIN = 15; // Marge depuis le bord
-
     // Style visuel
     private static final Color BG_COLOR = new Color(0, 0, 0, 150); // Fond semi-transparent
     private static final Color VIEWPORT_COLOR = new Color(255, 0, 0, 200); // Rectangle rouge
@@ -247,9 +245,6 @@ public class MinimapOverlay extends JPanel implements ObserverIF {
         // On veut déplacer vers (imageClickX, imageClickY)
 
         double zoom = perspective.getZoom();
-        int parentW = viewportParent.getWidth();
-        int parentH = viewportParent.getHeight();
-
         // Calcul de la nouvelle position du centre
         double newCentreX = -(imageClickX - imgRealW/2.0) * zoom;
         double newCentreY = -(imageClickY - imgRealH/2.0) * zoom;

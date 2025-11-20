@@ -2,7 +2,6 @@ package xvision.controller;
 
 import java.awt.Point;
 import java.awt.Dimension;
-import java.awt.image.BufferedImage;
 import xvision.model.PerspectiveLeaf;
 
 /**

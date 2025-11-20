@@ -20,8 +20,6 @@ import java.io.ByteArrayOutputStream;
 public class ImagePNG {
 
     private BufferedImage imagePNG;
-    private String cheminFichier;
-
     /**
      * Charge une image PNG depuis un fichier
      * Méthode spécifique au format PNG
@@ -30,7 +28,6 @@ public class ImagePNG {
      */
     public void chargerPNG(String chemin) {
         try {
-            this.cheminFichier = chemin;
             this.imagePNG = ImageIO.read(new File(chemin));
             System.out.println("[ImagePNG] Image PNG chargée: " + chemin);
         } catch (Exception e) {

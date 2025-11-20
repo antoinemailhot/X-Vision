@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.io.IOException;
+import java.awt.Rectangle;
 
 /**
  * Perspective individuelle (feuille) dans l'arbre Composite.
@@ -24,6 +25,7 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     private double x;
     private double y;
     private String cheminImage;
+    private Crop crop; // crop actuel
 
     public PerspectiveLeaf(double zoom, double x, double y) {
         super();
@@ -31,6 +33,7 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         this.zoom = zoom;
         this.x = x;
         this.y = y;
+        this.crop = null;
         gestionnaireMemento.sauvegarder(creerMemento());
     }
 
@@ -41,8 +44,20 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
      */
     public PerspectiveMemento creerMemento() {
         String etatJSON = exporterEnJSON();
-        return new PerspectiveMemento(idPerspective, zoom, x, y, etatJSON);
+        List<Crop> crops = (crop != null) ? List.of(crop) : List.of();
+        return new PerspectiveMemento(
+            idPerspective,
+            zoom,
+            x,
+            y,
+            etatJSON,
+            crops,           // crops
+            List.of(),       // annotations
+            etatJSON
+        );
     }
+
+
 
     /**
      * Exporte l'état courant en JSON, avec l'image encodée en Base64
@@ -55,14 +70,30 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         sb.append("\"x\":").append(x).append(",");
         sb.append("\"y\":").append(y).append(",");
 
+        // Image encodée en Base64
         String base64 = "";
         if (cheminImage != null && !cheminImage.isEmpty()) {
             base64 = encoderImageBase64(cheminImage);
         }
-        sb.append("\"imageBase64\":\"").append(base64).append("\"");
+        sb.append("\"imageBase64\":\"").append(base64).append("\",");
+
+        // Crop
+        if (crop != null && crop.getZone() != null) {
+            Rectangle r = crop.getZone();
+            sb.append("\"crop\":{");
+            sb.append("\"x\":").append(r.x).append(",");
+            sb.append("\"y\":").append(r.y).append(",");
+            sb.append("\"width\":").append(r.width).append(",");
+            sb.append("\"height\":").append(r.height);
+            sb.append("}");
+        } else {
+            sb.append("\"crop\":null");
+        }
+
         sb.append("}");
         return sb.toString();
     }
+
 
     /**
      * Encode le contenu de l'image en Base64
@@ -99,23 +130,21 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         this.x = m.getX();
         this.y = m.getY();
 
-        // Extraire imageBase64 du JSON
-        String json = m.getEtatJSON();
-        String base64 = extraireValeurJSON(json, "imageBase64");
-        if (!base64.isEmpty()) {
+        // Restaurer l'image
+        String base64 = m.getImageBase64();
+        if (base64 != null && !base64.isEmpty()) {
             String cheminRestauré = "restored_" + idPerspective + ".png";
             restaurerImageDepuisBase64(base64, cheminRestauré);
         }
 
-        notifier();
-    }
+        // Restaurer le crop
+        if (!m.getCrops().isEmpty() && m.getCrops().get(0) != null) {
+            this.crop = new Crop(m.getCrops().get(0).getZone());
+        } else {
+            this.crop = null;
+        }
 
-    /**
-     * Extrait la valeur d'une clé simple dans un JSON maison
-     */
-    private String extraireValeurJSON(String json, String key) {
-        String pattern = "\"" + key + "\":\"([^\"]*)\"";
-        return json.replaceAll(".*" + pattern + ".*", "$1");
+        notifier();
     }
 
     // ================== Undo / Redo ==================
@@ -134,6 +163,7 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     public double getCentreX() { return x; }
     public double getCentreY() { return y; }
     public String getCheminImage() { return cheminImage; }
+    public Crop getCrop() { return crop; }
 
     public void setZoom(double zoom) {
         gestionnaireMemento.sauvegarder(creerMemento());
@@ -157,11 +187,21 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         notifier();
     }
 
+    public void setCrop(Rectangle rect) {
+        if (rect != null) {
+            this.crop = new Crop(rect);
+        } else {
+            this.crop = null;
+        }
+        gestionnaireMemento.sauvegarder(creerMemento());
+        notifier();
+    }
+
     // ================== Méthodes Composite ==================
     @Override
     public void afficher() {
         System.out.println("Leaf [" + idPerspective + "] - Zoom: " + zoom +
-                ", Pos=(" + x + "," + y + ")");
+                ", Pos=(" + x + "," + y + "), Crop=" + (crop != null ? crop.getZone() : "null"));
     }
 
     @Override
@@ -176,4 +216,22 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     public List<PerspectiveComponent> getEnfants() { return List.of(); }
 
     public GestionnaireMemento getMementoManager() { return gestionnaireMemento; }
+
+    public List<PerspectiveMemento> getMementos() {
+        return gestionnaireMemento.getHistorique();
+    }
+
+    public void ajouterMemento(PerspectiveMemento m) {
+        gestionnaireMemento.sauvegarder(m);
+    }
+
+    /**
+     * Encode l'image actuelle en Base64
+     * @return Chaîne Base64 de l'image, ou chaîne vide si pas d'image
+     */
+    public String imageEnBase64() {
+        if (cheminImage == null || cheminImage.isEmpty()) return "";
+        return encoderImageBase64(cheminImage);
+    }
+
 }
