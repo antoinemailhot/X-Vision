@@ -6,9 +6,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.ArrayList;
+import java.awt.Rectangle;
 
 /**
  * Contrôleur principal pour les perspectives
+ * Gère création, modification, sauvegarde et restauration
  */
 public class ControleurPerspective {
 
@@ -54,22 +57,16 @@ public class ControleurPerspective {
 
     // -------------------- SAUVEGARDER / CHARGER PERSPECTIVE --------------------
 
-    /**
-     * Sauvegarde la perspective dans un fichier JSON, avec copie locale de l'image
-     * et sauvegarde de l'historique de mementos.
-     */
     public void sauvegarderPerspectiveActuelle(String cheminFichier) {
         try {
             PerspectiveLeaf p = gestionnaire.getDernierePerspective();
             if (p == null) return;
 
-            // Création du dossier pour images si nécessaire
             File dossierPerspectives = new File("perspectives/images");
             if (!dossierPerspectives.exists()) dossierPerspectives.mkdirs();
 
-            // Copier l'image localement pour rendre la perspective autonome
             String cheminImageOriginal = p.getCheminImage();
-            String cheminImageLocal = null;
+            String cheminImageLocal = "";
             if (cheminImageOriginal != null && !cheminImageOriginal.isEmpty()) {
                 File srcImage = new File(cheminImageOriginal);
                 if (srcImage.exists()) {
@@ -79,44 +76,58 @@ public class ControleurPerspective {
                 }
             }
 
-            // Construction JSON
+            if (!cheminFichier.endsWith(".json")) cheminFichier += ".json";
+
             StringBuilder sb = new StringBuilder();
             sb.append("{\n");
             sb.append("  \"zoom\": ").append(p.getZoom()).append(",\n");
             sb.append("  \"centreX\": ").append(p.getCentreX()).append(",\n");
             sb.append("  \"centreY\": ").append(p.getCentreY()).append(",\n");
-            sb.append("  \"cheminImage\": \"").append(cheminImageLocal != null ? cheminImageLocal : "").append("\",\n");
-
-            // Sauvegarde mementos
+            sb.append("  \"cheminImage\": \"").append(cheminImageLocal).append("\",\n");
             sb.append("  \"mementos\": [\n");
+
             List<PerspectiveMemento> mementos = p.getMementos();
             for (int i = 0; i < mementos.size(); i++) {
                 PerspectiveMemento m = mementos.get(i);
-                sb.append("    {\"zoom\": ").append(m.getZoom())
-                  .append(", \"centreX\": ").append(m.getX())
-                  .append(", \"centreY\": ").append(m.getY()).append("}");
+                sb.append("    {\n");
+                sb.append("      \"zoom\": ").append(m.getZoom()).append(",\n");
+                sb.append("      \"centreX\": ").append(m.getX()).append(",\n");
+                sb.append("      \"centreY\": ").append(m.getY()).append(",\n");
+
+                if (!m.getCrops().isEmpty()) {
+                    Crop c = m.getCrops().get(0); // On prend le premier crop
+                    Rectangle r = c.getZone();     // <-- correction ici
+                    sb.append("      \"crop\": {\n");
+                    sb.append("        \"x\": ").append(r.x).append(",\n");
+                    sb.append("        \"y\": ").append(r.y).append(",\n");
+                    sb.append("        \"width\": ").append(r.width).append(",\n");
+                    sb.append("        \"height\": ").append(r.height).append("\n");
+                    sb.append("      }\n");
+                } else {
+                    sb.append("      \"crop\": null\n");
+                }
+
+                sb.append("    }");
                 if (i < mementos.size() - 1) sb.append(",");
                 sb.append("\n");
             }
+
             sb.append("  ]\n");
             sb.append("}\n");
 
-            File f = new File(cheminFichier);
-            Files.writeString(f.toPath(), sb.toString());
-            System.out.println("[ControleurPerspective] Perspective sauvegardée dans " + f.getAbsolutePath());
+            Files.writeString(new File(cheminFichier).toPath(), sb.toString());
+            System.out.println("[ControleurPerspective] Perspective sauvegardée dans " + cheminFichier);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    /**
-     * Charge une perspective depuis un fichier JSON, restaurer image et mementos
-     */
     public PerspectiveLeaf chargerPerspective(String cheminFichier) {
         try {
             List<String> lignes = Files.readAllLines(new File(cheminFichier).toPath());
             double zoom = 1.0, x = 0.0, y = 0.0;
-            String cheminImage = null;
+            String cheminImage = "";
 
             StringBuilder mementosJson = new StringBuilder();
             boolean dansMementos = false;
@@ -124,54 +135,69 @@ public class ControleurPerspective {
             for (String ligne : lignes) {
                 ligne = ligne.trim();
                 if (ligne.startsWith("\"zoom\"") && !dansMementos) {
-                    zoom = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                    zoom = Double.parseDouble(ligne.split(":")[1].replace(",", "").trim());
                 } else if (ligne.startsWith("\"centreX\"") && !dansMementos) {
-                    x = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                    x = Double.parseDouble(ligne.split(":")[1].replace(",", "").trim());
                 } else if (ligne.startsWith("\"centreY\"") && !dansMementos) {
-                    y = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
+                    y = Double.parseDouble(ligne.split(":")[1].replace(",", "").trim());
                 } else if (ligne.startsWith("\"cheminImage\"")) {
-                    cheminImage = ligne.split(":")[1].replace("\"","").replace(",","").trim();
+                    cheminImage = ligne.split(":")[1].replace("\"", "").replace(",", "").trim();
                 } else if (ligne.startsWith("\"mementos\"")) {
                     dansMementos = true;
-                    mementosJson.append("[");
+                    mementosJson.append(ligne.substring(ligne.indexOf("["))).append("\n");
                 } else if (dansMementos) {
-                    mementosJson.append(ligne);
+                    mementosJson.append(ligne).append("\n");
                     if (ligne.endsWith("]")) dansMementos = false;
                 }
             }
 
             PerspectiveLeaf p = creerPerspective(zoom, x, y);
-            p.setCheminImage(cheminImage);
+            if (!cheminImage.isEmpty()) p.setCheminImage(cheminImage);
 
-            // Restaurer mementos
             if (mementosJson.length() > 0) {
-                String[] mementoItems = mementosJson.toString().replace("[","").replace("]","").split("\\},");
-                for (String item : mementoItems) {
-                    item = item.replace("{","").replace("}","").trim();
+                String json = mementosJson.toString();
+                json = json.substring(1, json.length() - 1).trim(); // Supprime [ ]
+                String[] items = json.split("\\},");
+                for (String item : items) {
+                    item = item.replace("{", "").replace("}", "").trim();
                     if (item.isEmpty()) continue;
+
                     double mz = 1.0, mx = 0.0, my = 0.0;
+                    Rectangle cropRect = null;
+
                     String[] champs = item.split(",");
                     for (String champ : champs) {
                         champ = champ.trim();
                         if (champ.startsWith("\"zoom\"")) mz = Double.parseDouble(champ.split(":")[1].trim());
                         else if (champ.startsWith("\"centreX\"")) mx = Double.parseDouble(champ.split(":")[1].trim());
                         else if (champ.startsWith("\"centreY\"")) my = Double.parseDouble(champ.split(":")[1].trim());
+                        else if (champ.startsWith("\"x\"")) {
+                            int cx = Integer.parseInt(champ.split(":")[1].trim());
+                            int cy = Integer.parseInt(champs[1].split(":")[1].trim());
+                            int width = Integer.parseInt(champs[2].split(":")[1].trim());
+                            int height = Integer.parseInt(champs[3].split(":")[1].trim());
+                            cropRect = new Rectangle(cx, cy, width, height);
+                        }
                     }
-                    p.ajouterMemento(new PerspectiveMemento(
-                        p.getIdPerspective(), // id
-                        mz,                  // zoom
-                        mx,                  // x
-                        my,                  // y
-                        "",                  // imageBase64
-                        List.of(),           // crops vides
-                        List.of(),           // annotations vides
-                        "{}"                 // etatJSON vide
-                    ));
+
+                    List<Crop> crops = cropRect != null ? List.of(new Crop(cropRect)) : new ArrayList<>();
+                    PerspectiveMemento m = new PerspectiveMemento(
+                        p.getIdPerspective(),
+                        mz,
+                        mx,
+                        my,
+                        "",
+                        crops,
+                        new ArrayList<>(),
+                        "{}"
+                    );
+                    p.ajouterMemento(m);
                 }
             }
 
             System.out.println("[ControleurPerspective] Perspective chargée depuis " + cheminFichier);
             return p;
+
         } catch (IOException e) {
             e.printStackTrace();
             return null;

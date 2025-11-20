@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.io.IOException;
 import java.awt.Rectangle;
+import java.util.stream.Collectors;
 
 /**
  * Perspective individuelle (feuille) dans l'arbre Composite.
@@ -57,8 +58,6 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         );
     }
 
-
-
     /**
      * Exporte l'état courant en JSON, avec l'image encodée en Base64
      */
@@ -71,10 +70,7 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         sb.append("\"y\":").append(y).append(",");
 
         // Image encodée en Base64
-        String base64 = "";
-        if (cheminImage != null && !cheminImage.isEmpty()) {
-            base64 = encoderImageBase64(cheminImage);
-        }
+        String base64 = (cheminImage != null && !cheminImage.isEmpty()) ? encoderImageBase64(cheminImage) : "";
         sb.append("\"imageBase64\":\"").append(base64).append("\",");
 
         // Crop
@@ -94,6 +90,35 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         return sb.toString();
     }
 
+    /**
+     * Exporte tous les mementos en JSON, incluant le crop de chacun
+     */
+    public String exporterMementosEnJSON() {
+        List<PerspectiveMemento> mementos = gestionnaireMemento.getHistorique();
+        String mementosJSON = mementos.stream()
+            .map(m -> {
+                StringBuilder sb = new StringBuilder();
+                sb.append("{");
+                sb.append("\"zoom\":").append(m.getZoom()).append(",");
+                sb.append("\"centreX\":").append(m.getX()).append(",");
+                sb.append("\"centreY\":").append(m.getY()).append(",");
+                if (!m.getCrops().isEmpty() && m.getCrops().get(0) != null) {
+                    Rectangle r = m.getCrops().get(0).getZone();
+                    sb.append("\"crop\":{");
+                    sb.append("\"x\":").append(r.x).append(",");
+                    sb.append("\"y\":").append(r.y).append(",");
+                    sb.append("\"width\":").append(r.width).append(",");
+                    sb.append("\"height\":").append(r.height);
+                    sb.append("}");
+                } else {
+                    sb.append("\"crop\":null");
+                }
+                sb.append("}");
+                return sb.toString();
+            })
+            .collect(Collectors.joining(","));
+        return "[" + mementosJSON + "]";
+    }
 
     /**
      * Encode le contenu de l'image en Base64

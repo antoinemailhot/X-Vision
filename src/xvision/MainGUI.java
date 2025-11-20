@@ -38,6 +38,10 @@ public class MainGUI extends JFrame implements ObserverIF {
     private JToggleButton btnOutilLigne;
     private JToggleButton btnOutilCrop;
 
+    // ---------------- Autosave -----------------
+    private final String cheminAutosave = "perspectives/autosave.json";
+    private javax.swing.Timer autosaveTimer;
+
     public MainGUI() {
         // Initialisation modèle / contrôleur
         gestionnairePerspectives = new GestionnaireDePerspectives();
@@ -77,9 +81,12 @@ public class MainGUI extends JFrame implements ObserverIF {
         }
 
         add(panelNavigation, BorderLayout.CENTER);
+
+        initialiserAutosave();
         actualiser();
     }
 
+    // ---------------------- PANEL NAVIGATION -----------------------
     private void creerPanelNavigation() {
         panelNavigation = new JPanel() {
             @Override
@@ -105,17 +112,20 @@ public class MainGUI extends JFrame implements ObserverIF {
                 g2dTransformed.translate(x, y);
                 g2dTransformed.scale(zoom, zoom);
 
+                // Dessin annotations
                 if (gestionnaireAnnotations != null) {
                     for (Annotation annotation : gestionnaireAnnotations.getAnnotations()) {
                         annotation.dessiner(g2dTransformed);
                     }
                 }
 
+                // Aperçu outil ligne
                 if (gestionnaireOutils != null && gestionnaireOutils.getModeLigne() != null) {
                     Annotation preview = gestionnaireOutils.getModeLigne().getOutil().getAnnotationPreview();
                     if (preview != null) preview.dessiner(g2dTransformed);
                 }
 
+                // Dessin crop
                 if (gestionnaireCrop != null && gestionnaireCrop.hasCrop()) {
                     Rectangle cropRect = gestionnaireCrop.getZoneCrop();
                     g2dTransformed.setColor(Color.RED);
@@ -123,6 +133,7 @@ public class MainGUI extends JFrame implements ObserverIF {
                     g2dTransformed.drawRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
                 }
 
+                // Aperçu crop
                 if (gestionnaireOutils != null && gestionnaireOutils.getModeCrop() != null) {
                     Rectangle previewRect = gestionnaireOutils.getModeCrop().getOutil().getRectanglePreview();
                     if (previewRect != null) {
@@ -153,6 +164,8 @@ public class MainGUI extends JFrame implements ObserverIF {
             if (perspective != null) {
                 double facteur = Math.pow(1.1, -e.getWheelRotation());
                 controleur.zoomerAvecFacteur(perspective, facteur);
+                programmerAutosave();
+                actualiser();
             }
         });
     }
@@ -173,6 +186,7 @@ public class MainGUI extends JFrame implements ObserverIF {
         }
     }
 
+    // ---------------------- TOOLBAR -----------------------
     private void creerToolbar() {
         JPanel toolbar = new JPanel();
         toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.Y_AXIS));
@@ -186,31 +200,28 @@ public class MainGUI extends JFrame implements ObserverIF {
         toolbar.add(labelImage);
         toolbar.add(Box.createVerticalStrut(10));
 
-        // ----------------- Charger Image -----------------
+        // Charger Image
         JButton btnChargerImage = new JButton("Charger Image");
         btnChargerImage.setMaximumSize(new Dimension(150, 30));
         btnChargerImage.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setCurrentDirectory(new File("resources/test_images"));
-            fileChooser.setDialogTitle("Sélectionner une image");
-            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
-                    "Images", "jpg", "jpeg", "png", "gif", "bmp"));
             int result = fileChooser.showOpenDialog(this);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File selectedFile = fileChooser.getSelectedFile();
                 perspective.setCheminImage(selectedFile.getAbsolutePath());
+                programmerAutosave();
                 actualiser();
             }
         });
         toolbar.add(btnChargerImage);
         toolbar.add(Box.createVerticalStrut(10));
 
-        // ----------------- Sauvegarder / Charger Perspective -----------------
+        // Sauvegarder / Charger Perspective
         JButton btnSauvegarderPerspective = new JButton("Sauvegarder Perspective");
         btnSauvegarderPerspective.setMaximumSize(new Dimension(150, 30));
         btnSauvegarderPerspective.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setDialogTitle("Sauvegarder la perspective");
             int result = fileChooser.showSaveDialog(this);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File fichier = fileChooser.getSelectedFile();
@@ -224,8 +235,6 @@ public class MainGUI extends JFrame implements ObserverIF {
         btnChargerPerspective.setMaximumSize(new Dimension(150, 30));
         btnChargerPerspective.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setDialogTitle("Charger une perspective");
-            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("JSON", "json"));
             int result = fileChooser.showOpenDialog(this);
             if (result == JFileChooser.APPROVE_OPTION) {
                 File fichier = fileChooser.getSelectedFile();
@@ -240,7 +249,7 @@ public class MainGUI extends JFrame implements ObserverIF {
         toolbar.add(btnChargerPerspective);
         toolbar.add(Box.createVerticalStrut(10));
 
-        // ----------------- Outils ligne / crop -----------------
+        // Outils ligne / crop
         btnOutilCrop = new JToggleButton("Outil Crop");
         btnOutilCrop.setMaximumSize(new Dimension(150, 30));
         btnOutilLigne = new JToggleButton("Outil Ligne");
@@ -263,22 +272,31 @@ public class MainGUI extends JFrame implements ObserverIF {
         toolbar.add(btnOutilLigne);
         toolbar.add(Box.createVerticalStrut(10));
 
-        // ----------------- Undo / Redo -----------------
+        // Undo / Redo
         JButton btnUndo = new JButton("Undo (Ctrl+Z)");
         btnUndo.setMaximumSize(new Dimension(150, 30));
-        btnUndo.addActionListener(e -> GestionnaireCommandes.getInstance().undo());
+        btnUndo.addActionListener(e -> {
+            GestionnaireCommandes.getInstance().undo();
+            programmerAutosave();
+            actualiser();
+        });
         toolbar.add(btnUndo);
 
         JButton btnRedo = new JButton("Redo (Ctrl+Y)");
         btnRedo.setMaximumSize(new Dimension(150, 30));
-        btnRedo.addActionListener(e -> GestionnaireCommandes.getInstance().redo());
+        btnRedo.addActionListener(e -> {
+            GestionnaireCommandes.getInstance().redo();
+            programmerAutosave();
+            actualiser();
+        });
         toolbar.add(btnRedo);
 
-        // ----------------- Effacer annotations -----------------
+        // Effacer annotations
         JButton btnEffacerAnnotations = new JButton("Effacer tout");
         btnEffacerAnnotations.setMaximumSize(new Dimension(150, 30));
         btnEffacerAnnotations.addActionListener(e -> {
             gestionnaireAnnotations.effacerTout();
+            programmerAutosave();
             panelNavigation.repaint();
         });
         toolbar.add(btnEffacerAnnotations);
@@ -287,20 +305,30 @@ public class MainGUI extends JFrame implements ObserverIF {
         add(toolbar, BorderLayout.EAST);
     }
 
+    // ---------------------- RACCOURCIS -----------------------
     private void configurerRaccourcis() {
         int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke('Z', shortcutMask), "undo");
         getRootPane().getActionMap().put("undo", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) { GestionnaireCommandes.getInstance().undo(); }
+            public void actionPerformed(ActionEvent e) {
+                GestionnaireCommandes.getInstance().undo();
+                programmerAutosave();
+                actualiser();
+            }
         });
         getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke('Y', shortcutMask), "redo");
         getRootPane().getActionMap().put("redo", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) { GestionnaireCommandes.getInstance().redo(); }
+            public void actionPerformed(ActionEvent e) {
+                GestionnaireCommandes.getInstance().redo();
+                programmerAutosave();
+                actualiser();
+            }
         });
     }
 
+    // ---------------------- MINIMAP -----------------------
     private void positionnerMinimap() {
         if (minimap != null && panelNavigation != null) {
             int margin = 15;
@@ -310,6 +338,22 @@ public class MainGUI extends JFrame implements ObserverIF {
         }
     }
 
+    // ---------------------- AUTOSAVE -----------------------
+    private void initialiserAutosave() {
+        File dossier = new File("perspectives");
+        if (!dossier.exists()) dossier.mkdirs();
+
+        autosaveTimer = new javax.swing.Timer(2000, e -> {
+            controleur.sauvegarderPerspectiveActuelle(cheminAutosave);
+        });
+        autosaveTimer.setRepeats(false);
+    }
+
+    private void programmerAutosave() {
+        if (autosaveTimer != null) autosaveTimer.restart();
+    }
+
+    // ---------------------- ACTUALISER -----------------------
     @Override
     public void actualiser() {
         if (perspective == null) return;
