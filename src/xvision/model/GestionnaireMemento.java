@@ -53,4 +53,38 @@ public class GestionnaireMemento {
         }
         return null;
     }
+
+    /**
+     * Fournit une copie de la pile Undo pour sérialisation (Save Prospect).
+     * @return Une copie immuable de la pile Undo.
+     */
+    public Stack<PerspectiveMemento> getPileUndoSnapshot() {
+        Stack<PerspectiveMemento> copie = new Stack<>();
+        copie.addAll(pileUndo);
+        return copie;
+    }   
+
+    /**
+     * Fournit une copie de la pile Redo pour sérialisation (Save Prospect).
+     * @return Une copie immuable de la pile Redo.
+     */
+    public Stack<PerspectiveMemento> getPileRedoSnapshot() {
+        Stack<PerspectiveMemento> copie = new Stack<>();
+        copie.addAll(pileRedo);
+        return copie;
+    }
+
+    /**
+     * Restaure les piles Undo/Redo à partir de données sérialisées (Load Prospect).
+     * @param undo Pile des états précédents à restaurer.
+     * @param redo Pile des états annulés à restaurer.
+     */
+    public void restaurerHistorique(Stack<PerspectiveMemento> undo, Stack<PerspectiveMemento> redo) {
+        pileUndo.clear();
+        pileUndo.addAll(undo);
+        pileRedo.clear();
+        pileRedo.addAll(redo);
+    }
+
+
 }
