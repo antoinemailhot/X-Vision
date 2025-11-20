@@ -1,29 +1,42 @@
 package xvision.model;
 
 import java.io.File;
-import java.util.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 
 /**
- * Gestionnaire des perspectives : création, stockage, sauvegarde, chargement
+ * Gestionnaire des perspectives : création, stockage, sauvegarde et chargement
  * Utilisation de JSON "maison" sans librairie externe
  */
 public class GestionnaireDePerspectives {
 
     private Map<String, PerspectiveComponent> perspectives = new HashMap<>();
 
+    /**
+     * Ajoute une perspective au gestionnaire avec un ID.
+     */
     public void ajouterPerspective(String id, PerspectiveComponent p) {
         perspectives.put(id, p);
     }
 
+    /**
+     * Récupère une perspective par son ID.
+     */
     public PerspectiveComponent getPerspective(String id) {
         return perspectives.get(id);
     }
 
+    /**
+     * Supprime une perspective par son ID.
+     */
     public void supprimerPerspective(String id) {
         perspectives.remove(id);
     }
 
+    /**
+     * Sauvegarde toutes les perspectives dans un dossier.
+     */
     public void sauvegarderToutes(String dossier) {
         File dir = new File(dossier);
         if (!dir.exists()) dir.mkdirs();
@@ -33,72 +46,66 @@ public class GestionnaireDePerspectives {
         }
     }
 
+    /**
+     * Sauvegarde une seule perspective dans un fichier JSON.
+     */
     public void sauvegarderPerspective(String id, String dossier) {
         PerspectiveComponent p = perspectives.get(id);
         if (p == null) return;
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n");
-        sb.append("  \"id\": \"").append(id).append("\",\n");
-        sb.append("  \"nom\": \"").append(p.getClass().getSimpleName()).append("\",\n");
-        sb.append("  \"zoom\": ").append(getZoom(p)).append(",\n");
-        sb.append("  \"centerX\": ").append(getCentreX(p)).append(",\n");
-        sb.append("  \"centerY\": ").append(getCentreY(p)).append(",\n");
-        sb.append("  \"timestamp\": ").append(System.currentTimeMillis() / 1000).append("\n");
-        sb.append("}\n");
+        String etatJSON;
+        if (p instanceof PerspectiveLeaf) {
+            etatJSON = ((PerspectiveLeaf) p).creerMemento().getEtatJSON();
+        } else {
+            etatJSON = "{}";
+        }
 
         try {
-            File fichier = new File(dossier + "/" + id + ".json");
-            Files.writeString(fichier.toPath(), sb.toString());
+            Path fichier = Path.of(dossier, id + ".json");
+            Files.writeString(fichier, etatJSON);
             System.out.println("[GestionnaireDePerspectives] Perspective " + id + " sauvegardée.");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Charge une perspective depuis un fichier JSON.
+     */
     public void chargerPerspective(String cheminFichier) {
         try {
-            List<String> lignes = Files.readAllLines(new File(cheminFichier).toPath());
-            double zoom = 1.0, x = 0.0, y = 0.0;
-            String id = "unknown";
-
-            for (String ligne : lignes) {
-                ligne = ligne.trim();
-                if (ligne.startsWith("\"id\"")) {
-                    id = ligne.split(":")[1].replace("\"","").replace(",","").trim();
-                } else if (ligne.startsWith("\"zoom\"")) {
-                    zoom = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
-                } else if (ligne.startsWith("\"centerX\"")) {
-                    x = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
-                } else if (ligne.startsWith("\"centerY\"")) {
-                    y = Double.parseDouble(ligne.split(":")[1].replace(",","").trim());
-                }
-            }
+            String json = Files.readString(Path.of(cheminFichier));
+            String id = extraireValeurJSON(json, "idPerspective");
+            double zoom = Double.parseDouble(extraireValeurJSON(json, "zoom"));
+            double x = Double.parseDouble(extraireValeurJSON(json, "x"));
+            double y = Double.parseDouble(extraireValeurJSON(json, "y"));
+            String imageBase64 = extraireValeurJSON(json, "imageBase64");
 
             PerspectiveLeaf p = new PerspectiveLeaf(zoom, x, y);
-            ajouterPerspective(id, p);
-            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " chargée.");
 
+            if (imageBase64 != null && !imageBase64.isEmpty()) {
+                String cheminRestauré = "restored_" + id + ".png";
+                p.restaurerImageDepuisBase64(imageBase64, cheminRestauré);
+            }
+
+            perspectives.put(id, p);
+            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " chargée.");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private double getZoom(PerspectiveComponent p) {
-        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getZoom();
-        return 1.0;
+    /**
+     * Extrait la valeur d'une clé dans un JSON maison simple
+     */
+    private String extraireValeurJSON(String json, String key) {
+        String pattern = "\"" + key + "\":\"?([^\"]*)\"?";
+        return json.replaceAll(".*" + pattern + ".*", "$1");
     }
 
-    private double getCentreX(PerspectiveComponent p) {
-        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getCentreX();
-        return 0.0;
-    }
-
-    private double getCentreY(PerspectiveComponent p) {
-        if (p instanceof PerspectiveLeaf) return ((PerspectiveLeaf) p).getCentreY();
-        return 0.0;
-    }
-
+    /**
+     * Affiche toutes les perspectives
+     */
     public void afficherToutes() {
         for (Map.Entry<String, PerspectiveComponent> entry : perspectives.entrySet()) {
             System.out.println("ID: " + entry.getKey());
@@ -108,26 +115,12 @@ public class GestionnaireDePerspectives {
 
     /**
      * Ajoute une perspective simple avec génération automatique d'ID
-     * Principe GRASP: Creator - Le gestionnaire crée les perspectives
-     * @param zoom Niveau de zoom initial
-     * @param x Position X initiale
-     * @param y Position Y initiale
-     * @return La perspective créée
      */
     public PerspectiveLeaf ajouterPerspectiveSimple(double zoom, double x, double y) {
-        // Génère un ID unique basé sur le temps et un nombre aléatoire
         String id = "perspective_" + System.currentTimeMillis() + "_" + new Random().nextInt(1000);
-
-        // Crée une nouvelle perspective
         PerspectiveLeaf nouvellePerspective = new PerspectiveLeaf(zoom, x, y);
-
-        // Ajoute la perspective à la collection
         perspectives.put(id, nouvellePerspective);
-
-        // Message de confirmation
         System.out.println("[GestionnaireDePerspectives] Nouvelle perspective ajoutée : " + id);
-
         return nouvellePerspective;
     }
-
 }

@@ -1,6 +1,10 @@
 package xvision.model;
 
+import java.util.Base64;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.io.IOException;
 
 /**
  * Perspective individuelle (feuille) dans l'arbre Composite.
@@ -13,97 +17,130 @@ import java.util.List;
  */
 public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
 
-    // Identifiant unique pour cette perspective
     private final int idPerspective;
-
-    // Historique Memento propre à cette perspective
     private final GestionnaireMemento gestionnaireMemento = new GestionnaireMemento();
 
-    // État interne
     private double zoom;
     private double x;
     private double y;
     private String cheminImage;
 
-    /**
-     * Constructeur
-     * @param zoom niveau de zoom initial
-     * @param x    position X du centre
-     * @param y    position Y du centre
-     */
     public PerspectiveLeaf(double zoom, double x, double y) {
         super();
         this.idPerspective = Identifiant.generer();
         this.zoom = zoom;
         this.x = x;
         this.y = y;
-
-        // Sauvegarde initiale de l'état
         gestionnaireMemento.sauvegarder(creerMemento());
     }
 
-    /**
-     * Identifiant unique de la perspective.
-     */
-    public int getIdPerspective() {
-        return idPerspective;
-    }
+    public int getIdPerspective() { return idPerspective; }
 
     /**
-     * Création d'un Memento sauvegardant l'état actuel.
+     * Création d'un Memento avec l'état complet
      */
     public PerspectiveMemento creerMemento() {
-        return new PerspectiveMemento(idPerspective, zoom, x, y);
+        String etatJSON = exporterEnJSON();
+        return new PerspectiveMemento(idPerspective, zoom, x, y, etatJSON);
     }
 
     /**
-     * Restaure l'état depuis un Memento (Undo/Redo).
+     * Exporte l'état courant en JSON, avec l'image encodée en Base64
+     */
+    public String exporterEnJSON() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"idPerspective\":").append(idPerspective).append(",");
+        sb.append("\"zoom\":").append(zoom).append(",");
+        sb.append("\"x\":").append(x).append(",");
+        sb.append("\"y\":").append(y).append(",");
+
+        String base64 = "";
+        if (cheminImage != null && !cheminImage.isEmpty()) {
+            base64 = encoderImageBase64(cheminImage);
+        }
+        sb.append("\"imageBase64\":\"").append(base64).append("\"");
+        sb.append("}");
+        return sb.toString();
+    }
+
+    /**
+     * Encode le contenu de l'image en Base64
+     */
+    private String encoderImageBase64(String chemin) {
+        try {
+            byte[] bytes = Files.readAllBytes(Path.of(chemin));
+            return Base64.getEncoder().encodeToString(bytes);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+
+    /**
+     * Restaure l'image à partir d'un contenu Base64 dans un chemin donné
+     */
+    public void restaurerImageDepuisBase64(String base64, String cheminRestauré) {
+        if (base64 == null || base64.isEmpty()) return;
+        try {
+            byte[] bytes = Base64.getDecoder().decode(base64);
+            Files.write(Path.of(cheminRestauré), bytes);
+            this.cheminImage = cheminRestauré;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Restaure l'état depuis un Memento (Undo/Redo)
      */
     public void restaurerDepuisMemento(PerspectiveMemento m) {
         this.zoom = m.getZoom();
         this.x = m.getX();
         this.y = m.getY();
+
+        // Extraire imageBase64 du JSON
+        String json = m.getEtatJSON();
+        String base64 = extraireValeurJSON(json, "imageBase64");
+        if (!base64.isEmpty()) {
+            String cheminRestauré = "restored_" + idPerspective + ".png";
+            restaurerImageDepuisBase64(base64, cheminRestauré);
+        }
+
         notifier();
     }
 
     /**
-     * Undo : restaure l'état précédent.
+     * Extrait la valeur d'une clé simple dans un JSON maison
      */
+    private String extraireValeurJSON(String json, String key) {
+        String pattern = "\"" + key + "\":\"([^\"]*)\"";
+        return json.replaceAll(".*" + pattern + ".*", "$1");
+    }
+
+    // ================== Undo / Redo ==================
     public void undo() {
         PerspectiveMemento m = gestionnaireMemento.undo();
         if (m != null) restaurerDepuisMemento(m);
     }
 
-    /**
-     * Redo : réapplique l'action annulée.
-     */
     public void redo() {
         PerspectiveMemento m = gestionnaireMemento.redo();
         if (m != null) restaurerDepuisMemento(m);
     }
 
-    // ================== GETTERS ==================
-
+    // ================== Getters / Setters ==================
     public double getZoom() { return zoom; }
     public double getCentreX() { return x; }
     public double getCentreY() { return y; }
     public String getCheminImage() { return cheminImage; }
 
-    // ================== SETTERS OPTIMISÉS ==================
-
-    /**
-     * Modifie le zoom avec sauvegarde automatique (Memento).
-     */
     public void setZoom(double zoom) {
         gestionnaireMemento.sauvegarder(creerMemento());
         this.zoom = zoom;
         notifier();
     }
 
-    /**
-     * Définit la position complète du centre.
-     * Utilisé comme méthode principale pour la cohérence.
-     */
     public void setCentre(double x, double y) {
         gestionnaireMemento.sauvegarder(creerMemento());
         this.x = x;
@@ -111,31 +148,16 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         notifier();
     }
 
-    /**
-     * Modifie seulement X avec cohérence (passe par setCentre).
-     */
-    public void setCentreX(double x) {
-        setCentre(x, this.y);
-    }
+    public void setCentreX(double x) { setCentre(x, this.y); }
+    public void setCentreY(double y) { setCentre(this.x, y); }
 
-    /**
-     * Modifie seulement Y avec cohérence (passe par setCentre).
-     */
-    public void setCentreY(double y) {
-        setCentre(this.x, y);
-    }
-
-    /**
-     * Définit le chemin vers l'image associée.
-     */
     public void setCheminImage(String cheminImage) {
         gestionnaireMemento.sauvegarder(creerMemento());
         this.cheminImage = cheminImage;
         notifier();
     }
 
-    // ================== MÉTHODES COMPOSITE ==================
-
+    // ================== Méthodes Composite ==================
     @Override
     public void afficher() {
         System.out.println("Leaf [" + idPerspective + "] - Zoom: " + zoom +
@@ -148,19 +170,10 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
     }
 
     @Override
-    public void supprimer(PerspectiveComponent p) {
-        // Aucun enfant dans une feuille
-    }
+    public void supprimer(PerspectiveComponent p) {}
 
     @Override
-    public List<PerspectiveComponent> getEnfants() {
-        return List.of(); // Feuille = pas d'enfants
-    }
+    public List<PerspectiveComponent> getEnfants() { return List.of(); }
 
-    /**
-     * Accès au gestionnaire de Memento pour les opérations externes si nécessaire.
-     */
-    public GestionnaireMemento getMementoManager() {
-        return gestionnaireMemento;
-    }
+    public GestionnaireMemento getMementoManager() { return gestionnaireMemento; }
 }
