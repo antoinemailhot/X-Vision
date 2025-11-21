@@ -1,0 +1,552 @@
+@startuml Architecture Complète X-Vision
+!define LIGHTBLUE #E3F2FD
+!define LIGHTGREEN #E8F5E9
+!define LIGHTYELLOW #FFF9C4
+!define LIGHTPINK #FCE4EC
+
+title Architecture Complète X-Vision\nPatrons GoF & GRASP
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam roundcorner 10
+skinparam shadowing false
+
+package "xvision.model" LIGHTBLUE {
+
+    ' ============ Patron Observer ============
+    package "Observer Pattern" {
+        abstract class Sujet {
+            - observateurs : List<ObserverIF>
+            + attacher(ObserverIF) : void
+            + detacher(ObserverIF) : void
+            # notifier() : void
+            + getNombreObservateurs() : int
+        }
+        note right of Sujet
+            Patron: Observer (GoF)
+            GRASP: Information Expert
+            Gère la liste d'observateurs
+        end note
+    }
+
+    ' ============ Patron Composite ============
+    package "Composite Pattern" {
+        interface PerspectiveComponent {
+            + afficher() : void
+            + ajouter(PerspectiveComponent) : void
+            + supprimer(PerspectiveComponent) : void
+            + getEnfants() : List<PerspectiveComponent>
+        }
+
+        class PerspectiveLeaf {
+            - idPerspective : int
+            - gestionnaireMemento : GestionnaireMemento
+            - zoom : double
+            - x : double
+            - y : double
+            - cheminImage : String
+            - crop : Crop
+            + setZoom(double) : void
+            + setCentre(double, double) : void
+            + creerMemento() : PerspectiveMemento
+            + restaurerDepuisMemento(PerspectiveMemento) : void
+            + undo() : void
+            + redo() : void
+            + exporterEnJSON() : String
+        }
+
+        class PerspectiveComposite {
+            - enfants : List<PerspectiveComponent>
+            + afficher() : void
+            + ajouter(PerspectiveComponent) : void
+            + supprimer(PerspectiveComponent) : void
+        }
+
+        class GestionnaireDePerspectives {
+            - perspectives : Map<String, PerspectiveComponent>
+            + ajouterPerspectiveSimple(double, double, double) : PerspectiveLeaf
+            + sauvegarderPerspective(String, String) : void
+            + chargerPerspective(String) : void
+        }
+    }
+
+    PerspectiveComponent <|.. PerspectiveLeaf
+    PerspectiveComponent <|.. PerspectiveComposite
+    Sujet <|-- PerspectiveLeaf
+    GestionnaireDePerspectives o-- PerspectiveComponent
+
+    note top of PerspectiveLeaf
+        Patron: Composite (Leaf)
+        Patron: Observer (Subject)
+        Patron: Memento (Originator)
+        GRASP: Information Expert
+    end note
+
+    ' ============ Patron Memento ============
+    package "Memento Pattern" {
+        class PerspectiveMemento {
+            - idPerspective : int
+            - zoom : double
+            - x : double
+            - y : double
+            - imageBase64 : String
+            - crops : List<Crop>
+            - annotations : List<String>
+            - etatJSON : String
+            + getZoom() : double
+            + getX() : double
+            + getY() : double
+            + exporterEnJSON() : String
+            + {static} fromJSON(String, int) : PerspectiveMemento
+        }
+
+        class GestionnaireMemento {
+            - pileUndo : Stack<PerspectiveMemento>
+            - pileRedo : Stack<PerspectiveMemento>
+            + sauvegarder(PerspectiveMemento) : void
+            + undo() : PerspectiveMemento
+            + redo() : PerspectiveMemento
+            + getHistorique() : List<PerspectiveMemento>
+        }
+    }
+
+    PerspectiveLeaf --> GestionnaireMemento
+    PerspectiveLeaf ..> PerspectiveMemento : <<create>>
+    GestionnaireMemento o-- PerspectiveMemento
+
+    note top of PerspectiveMemento
+        Patron: Memento (GoF)
+        Immuable (final fields)
+    end note
+
+    ' ============ Patron Adapter + Factory ============
+    package "Adapter & Factory Pattern" {
+        interface ImageTarget {
+            + charger(String) : void
+            + afficher() : void
+            + getLargeur() : int
+            + getHauteur() : int
+            + getDonneesPixels() : byte[]
+        }
+
+        class AdapterPNG {
+            - adaptee : ImagePNG
+            + charger(String) : void
+            + afficher() : void
+        }
+
+        class AdapterJPEG {
+            - adaptee : ImageJPEG
+            + charger(String) : void
+            + afficher() : void
+        }
+
+        class AdapterSVG {
+            - adaptee : ImageSVG
+            + charger(String) : void
+            + afficher() : void
+        }
+
+        class FabriqueImage {
+            + {static} creerImage(String) : ImageTarget
+            - {static} detecterFormat(String) : FormatImage
+            - {static} creerAdaptateur(FormatImage, String) : ImageTarget
+        }
+
+        enum FormatImage {
+            PNG
+            JPEG
+            JPG
+            SVG
+            INCONNU
+        }
+
+        class "ImagePNG\n(Adaptee)" as ImagePNG
+        class "ImageJPEG\n(Adaptee)" as ImageJPEG
+        class "ImageSVG\n(Adaptee)" as ImageSVG
+    }
+
+    ImageTarget <|.. AdapterPNG
+    ImageTarget <|.. AdapterJPEG
+    ImageTarget <|.. AdapterSVG
+
+    AdapterPNG o-- ImagePNG
+    AdapterJPEG o-- ImageJPEG
+    AdapterSVG o-- ImageSVG
+
+    FabriqueImage ..> ImageTarget : <<create>>
+    FabriqueImage ..> FormatImage : <<use>>
+
+    note top of FabriqueImage
+        Patron: Factory Method (GoF)
+        GRASP: Creator
+        GRASP: Information Expert
+    end note
+
+    note right of ImageTarget
+        Patron: Adapter (GoF)
+        Target interface
+    end note
+
+    ' ============ Annotations & Crop ============
+    package "Annotations & Crop" {
+        abstract class Annotation {
+            + {abstract} dessiner(Graphics2D) : void
+        }
+
+        class AnnotationLigne {
+            - point1 : Point
+            - point2 : Point
+            - couleur : Color
+            - epaisseur : int
+            + dessiner(Graphics2D) : void
+        }
+
+        class GestionnaireAnnotations {
+            - annotations : List<Annotation>
+            + ajouter(Annotation) : void
+            + supprimer(Annotation) : void
+            + effacerTout() : void
+            + getAnnotations() : List<Annotation>
+        }
+
+        class Crop {
+            - zone : Rectangle
+            + getZone() : Rectangle
+        }
+
+        class GestionnaireCrop {
+            - cropActuel : Crop
+            + definirCrop(Rectangle) : void
+            + getZoneCrop() : Rectangle
+            + hasCrop() : boolean
+        }
+    }
+
+    Annotation <|-- AnnotationLigne
+    GestionnaireAnnotations o-- Annotation
+    PerspectiveLeaf --> Crop
+
+    ' ============ Utilitaires ============
+    class Identifiant {
+        - {static} compteur : int
+        + {static} generer() : int
+    }
+}
+
+package "xvision.view" LIGHTGREEN {
+
+    interface "ObserverIF\n(Observer)" as ObserverIF {
+        + actualiser() : void
+    }
+
+    abstract class VueAbstraite {
+        # sujetObserve : Sujet
+        + setSujet(Sujet) : void
+        + getSujet() : Sujet
+        + {final} actualiser() : void
+        # {abstract} rafraichir() : void
+        + detacher() : void
+    }
+
+    class Vignette {
+        # rafraichir() : void
+    }
+
+    class VueMini {
+        # rafraichir() : void
+    }
+
+    class VuePrincipale {
+        - perspective : PerspectiveLeaf
+        - controleur : ControleurPerspective
+        - imageChargee : BufferedImage
+        - minimap : MinimapOverlay
+        + actualiser() : void
+        + setPerspective(PerspectiveLeaf) : void
+    }
+
+    class VueAnnotations {
+        - perspective : PerspectiveLeaf
+        - gestionnaireAnnotations : GestionnaireAnnotations
+        + actualiser() : void
+    }
+
+    class MinimapOverlay {
+        - perspective : PerspectiveLeaf
+        + actualiser() : void
+    }
+
+    ObserverIF <|.. VueAbstraite
+    VueAbstraite <|-- Vignette
+    VueAbstraite <|-- VueMini
+    ObserverIF <|.. VuePrincipale
+    ObserverIF <|.. VueAnnotations
+    ObserverIF <|.. MinimapOverlay
+
+    note top of VueAbstraite
+        Patron: Observer (Observer)
+        Patron: Template Method
+        GRASP: Low Coupling
+    end note
+
+    note top of VuePrincipale
+        ⚠️ Devrait hériter VueAbstraite
+        Actuellement: duplication code
+    end note
+}
+
+package "xvision.controller" LIGHTYELLOW {
+
+    ' ============ Patron Command ============
+    package "Command Pattern" {
+        interface Commande {
+            + executer() : void
+            + annuler() : void
+        }
+
+        class CommandeZoom {
+            - perspective : PerspectiveLeaf
+            - ancienZoom : double
+            - nouveauZoom : double
+            + executer() : void
+            + annuler() : void
+        }
+
+        class CommandeTranslation {
+            - perspective : PerspectiveLeaf
+            - ancienneX : double
+            - ancienneY : double
+            - nouvelleX : double
+            - nouvelleY : double
+            + executer() : void
+            + annuler() : void
+        }
+
+        class CommandeAjouterAnnotation {
+            - gestionnaireAnnotations : GestionnaireAnnotations
+            - annotation : Annotation
+            + executer() : void
+            + annuler() : void
+        }
+
+        class CommandeDefinirCrop {
+            - perspective : PerspectiveLeaf
+            - ancienCrop : Crop
+            - nouveauCrop : Crop
+            + executer() : void
+            + annuler() : void
+        }
+    }
+
+    Commande <|.. CommandeZoom
+    Commande <|.. CommandeTranslation
+    Commande <|.. CommandeAjouterAnnotation
+    Commande <|.. CommandeDefinirCrop
+
+    ' ============ Patron Singleton ============
+    class GestionnaireCommandes <<Singleton>> {
+        - {static} instance : GestionnaireCommandes
+        - pileUndo : Stack<Commande>
+        - pileRedo : Stack<Commande>
+        - GestionnaireCommandes()
+        + {static} getInstance() : GestionnaireCommandes
+        + executerCommande(Commande) : void
+        + undo() : void
+        + redo() : void
+    }
+
+    GestionnaireCommandes o-- Commande
+
+    note right of GestionnaireCommandes
+        Patron: Singleton (GoF)
+        GRASP: Controller
+        Instance unique
+    end note
+
+    ' ============ Patron Mediator ============
+    package "Mediator Pattern" {
+        interface Mediator {
+            + notifier(Object, String, Object) : void
+        }
+
+        class MediatorCopie {
+            - source : PerspectiveLeaf
+            - cible : PerspectiveLeaf
+            + notifier(Object, String, Object) : void
+        }
+
+        class GestionnaireCopie {
+            - mediator : MediatorCopie
+            + copier(PerspectiveLeaf) : void
+            + coller(PerspectiveLeaf) : void
+        }
+    }
+
+    Mediator <|.. MediatorCopie
+    GestionnaireCopie --> MediatorCopie
+
+    note top of MediatorCopie
+        Patron: Mediator (GoF)
+        GRASP: Low Coupling
+        ⚠️ Strategy manquant!
+    end note
+
+    ' ============ Patron State ============
+    package "State Pattern" {
+        interface ModeInteraction {
+            + activer(JPanel, ContexteMode) : void
+            + desactiver(JPanel) : void
+            + getCurseur() : Cursor
+        }
+
+        class ModeNavigation {
+            + activer(JPanel, ContexteMode) : void
+            + desactiver(JPanel) : void
+            + getCurseur() : Cursor
+        }
+
+        class ModeLigne {
+            - outil : OutilLigne
+            + activer(JPanel, ContexteMode) : void
+            + desactiver(JPanel) : void
+        }
+
+        class ModeCrop {
+            - outil : OutilCrop
+            + activer(JPanel, ContexteMode) : void
+            + desactiver(JPanel) : void
+        }
+
+        class ContexteMode {
+            - perspective : PerspectiveLeaf
+            - controleur : ControleurPerspective
+            - gestionnaireAnnotations : GestionnaireAnnotations
+            - gestionnaireCrop : GestionnaireCrop
+            - imageChargee : BufferedImage
+        }
+
+        class GestionnaireOutils {
+            - modeActuel : ModeInteraction
+            - contexte : ContexteMode
+            + activerModeNavigation() : void
+            + activerModeLigne(Color, int) : void
+            + activerModeCrop() : void
+        }
+    }
+
+    ModeInteraction <|.. ModeNavigation
+    ModeInteraction <|.. ModeLigne
+    ModeInteraction <|.. ModeCrop
+
+    GestionnaireOutils --> ModeInteraction
+    GestionnaireOutils --> ContexteMode
+    ModeInteraction --> ContexteMode
+
+    note right of ModeInteraction
+        Patron: State (GoF) - BONUS
+        GRASP: Polymorphisme
+    end note
+
+    ' ============ Contrôleur Principal ============
+    class ControleurPerspective {
+        - gestionnairePerspectives : GestionnaireDePerspectives
+        + creerPerspective(double, double, double) : PerspectiveLeaf
+        + zoomerAvecFacteur(PerspectiveLeaf, double) : void
+        + deplacerDelta(PerspectiveLeaf, double, double) : void
+        + sauvegarderPerspectiveActuelle(String) : void
+        + chargerPerspective(String) : PerspectiveLeaf
+    }
+
+    ControleurPerspective --> GestionnaireDePerspectives
+
+    note right of ControleurPerspective
+        GRASP: Controller
+        Centralise opérations utilisateur
+        Délègue via Commandes
+    end note
+
+    ' ============ Outils ============
+    package "Outils" {
+        interface OutilDessin {
+            + onMousePressed(MouseEvent) : void
+            + onMouseDragged(MouseEvent) : void
+            + onMouseReleased(MouseEvent) : void
+        }
+
+        class OutilLigne {
+            - couleur : Color
+            - epaisseur : int
+            - annotationPreview : AnnotationLigne
+        }
+
+        class OutilCrop {
+            - rectanglePreview : Rectangle
+        }
+    }
+
+    OutilDessin <|.. OutilLigne
+    OutilDessin <|.. OutilCrop
+
+    ModeLigne --> OutilLigne
+    ModeCrop --> OutilCrop
+
+    class ConvertisseurCoordonnees {
+        + {static} ecranVersImage(Point, double, double, double, double, double) : Point
+        + {static} imageVersEcran(Point, double, double, double, double, double) : Point
+    }
+}
+
+package "xvision" LIGHTPINK {
+    class MainGUI {
+        - gestionnairePerspectives : GestionnaireDePerspectives
+        - perspective : PerspectiveLeaf
+        - controleur : ControleurPerspective
+        - gestionnaireOutils : GestionnaireOutils
+        - contexte : ContexteMode
+        + main(String[]) : void
+        + actualiser() : void
+    }
+
+    MainGUI --> GestionnaireDePerspectives
+    MainGUI --> ControleurPerspective
+    MainGUI --> PerspectiveLeaf
+    MainGUI --> GestionnaireOutils
+    MainGUI ..> ObserverIF
+}
+
+' ============ Relations entre packages ============
+Sujet --> ObserverIF : notifie
+VueAbstraite --> Sujet : observe
+VuePrincipale --> PerspectiveLeaf : observe
+VuePrincipale --> ControleurPerspective : utilise
+
+CommandeZoom --> PerspectiveLeaf : modifie
+CommandeTranslation --> PerspectiveLeaf : modifie
+ControleurPerspective ..> Commande : <<create>>
+ControleurPerspective --> GestionnaireCommandes : utilise
+
+' ============ Légende ============
+legend top right
+    **Légende des Patrons GoF**
+    Observer: Sujet ↔ ObserverIF
+    Command: Commande + GestionnaireCommandes
+    Memento: PerspectiveMemento + GestionnaireMemento
+    Strategy: ⚠️ À implémenter (copier/coller)
+    Mediator: MediatorCopie
+    Singleton: GestionnaireCommandes
+    Factory Method: FabriqueImage
+    Adapter: AdapterPNG/JPEG/SVG
+    Composite: PerspectiveComponent
+    State (Bonus): ModeInteraction
+    Template Method (Bonus): VueAbstraite.rafraichir()
+
+    **Principes GRASP**
+    Information Expert: PerspectiveLeaf, Sujet
+    Creator: GestionnaireDePerspectives, FabriqueImage
+    Controller: GestionnaireCommandes, ControleurPerspective
+    Low Coupling: Interfaces, Observer, Mediator
+    High Cohesion: Responsabilités claires par classe
+end legend
+
+@enduml

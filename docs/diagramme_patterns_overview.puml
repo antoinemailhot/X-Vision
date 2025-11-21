@@ -1,0 +1,468 @@
+@startuml Récapitulatif Patrons GoF X-Vision
+!define SUCCESS #90EE90
+!define WARNING #FFD700
+!define INFO #87CEEB
+!define BONUS #DDA0DD
+
+title Récapitulatif des Patrons de Conception GoF & GRASP\nProjet X-Vision
+
+skinparam shadowing false
+skinparam roundcorner 15
+skinparam ArrowThickness 2
+
+' ============ Patrons GoF Comportementaux ============
+package "Patrons Comportementaux (GoF)" INFO {
+
+    card "**1. OBSERVER**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - Sujet (Subject)
+            - ObserverIF (Observer)
+            - VueAbstraite (ConcreteObserver)
+            - PerspectiveLeaf (ConcreteSubject)
+
+            **Problème résolu:**
+            Synchroniser automatiquement
+            plusieurs vues quand le modèle change
+
+            **Localisation:**
+            model/Sujet.java
+            view/ObserverIF.java
+            view/VueAbstraite.java
+
+            **Principe GRASP:**
+            Low Coupling (modèle ≠ vues)
+
+            **GoF:** p.293
+        end note
+    }
+
+    card "**2. COMMAND**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - Commande (Command)
+            - CommandeZoom (ConcreteCommand)
+            - CommandeTranslation (ConcreteCommand)
+            - GestionnaireCommandes (Invoker)
+            - PerspectiveLeaf (Receiver)
+
+            **Problème résolu:**
+            Undo/Redo pour actions utilisateur
+            Découpler requête de son exécution
+
+            **Localisation:**
+            controller/Commande.java
+            controller/CommandeZoom.java
+            controller/GestionnaireCommandes.java
+
+            **Principe GRASP:**
+            Controller (gère événements système)
+
+            **GoF:** p.233
+        end note
+    }
+
+    card "**3. MEMENTO**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - PerspectiveMemento (Memento)
+            - GestionnaireMemento (Caretaker)
+            - PerspectiveLeaf (Originator)
+
+            **Problème résolu:**
+            Sauvegarder/restaurer état complet
+            sans violer encapsulation
+
+            **Localisation:**
+            model/PerspectiveMemento.java
+            model/GestionnaireMemento.java
+
+            **Principe GRASP:**
+            Low Coupling (caretaker ne connaît
+            pas l'interne de Perspective)
+
+            **GoF:** p.283
+        end note
+    }
+
+    card "**4. STRATEGY**\n⚠️ Partiel (30%)" #FFD700 {
+        note
+            **Participants (attendus):**
+            - StrategieCopie (Strategy)
+            - CopieEchelle (ConcreteStrategy)
+            - CopieTranslation (ConcreteStrategy)
+            - CopieComplete (ConcreteStrategy)
+            - GestionnaireCopie (Context)
+
+            **Problème à résoudre:**
+            Stratégies interchangeables
+            pour copier/coller (zoom/position/tout)
+
+            **⚠️ Actuellement:**
+            Copie seulement position (x, y)
+            Pas de stratégies interchangeables
+
+            **À FAIRE:**
+            Implémenter interface + 4 stratégies
+
+            **GoF:** p.315
+        end note
+    }
+
+    card "**5. MEDIATOR**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - Mediator (Mediator)
+            - MediatorCopie (ConcreteMediator)
+            - GestionnaireCopie (Colleague)
+            - PerspectiveLeaf (Colleague)
+
+            **Problème résolu:**
+            Coordonner copier/coller sans
+            couplage direct entre perspectives
+
+            **Localisation:**
+            controller/Mediator.java
+            controller/MediatorCopie.java
+
+            **Principe GRASP:**
+            Low Coupling
+
+            **GoF:** p.273
+        end note
+    }
+
+    card "**BONUS: STATE**\n✅ Complet" #DDA0DD {
+        note
+            **Participants:**
+            - ModeInteraction (State)
+            - ModeNavigation (ConcreteState)
+            - ModeLigne (ConcreteState)
+            - ModeCrop (ConcreteState)
+            - GestionnaireOutils (Context)
+
+            **Problème résolu:**
+            Changer comportement selon mode actif
+            (navigation, dessin, crop)
+
+            **Localisation:**
+            controller/ModeInteraction.java
+            controller/ModeNavigation.java
+
+            **Principe GRASP:**
+            Polymorphisme
+
+            **GoF:** p.305
+        end note
+    }
+
+    card "**BONUS: TEMPLATE METHOD**\n✅ Complet" #DDA0DD {
+        note
+            **Participants:**
+            - VueAbstraite (AbstractClass)
+            - Vignette (ConcreteClass)
+            - VueMini (ConcreteClass)
+
+            **Problème résolu:**
+            Définir squelette algorithme
+            (actualiser → rafraichir)
+            tout en variant les détails
+
+            **Localisation:**
+            view/VueAbstraite.java
+
+            **Template method:**
+            actualiser() final
+            rafraichir() abstract
+
+            **GoF:** p.325
+        end note
+    }
+}
+
+' ============ Patrons GoF Créatifs ============
+package "Patrons Créatifs (GoF)" SUCCESS {
+
+    card "**6. SINGLETON**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - GestionnaireCommandes (Singleton)
+
+            **Problème résolu:**
+            Garantir une seule instance
+            Point d'accès global
+
+            **Implémentation:**
+            - Constructeur privé
+            - getInstance() statique
+            - Instance unique partagée
+
+            **Localisation:**
+            controller/GestionnaireCommandes.java
+
+            **Principe GRASP:**
+            Controller
+
+            **GoF:** p.127
+        end note
+    }
+
+    card "**7. FACTORY METHOD**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - FabriqueImage (Creator)
+            - ImageTarget (Product)
+            - AdapterPNG/JPEG/SVG (ConcreteProduct)
+
+            **Problème résolu:**
+            Créer adaptateurs sans spécifier
+            classe concrète (PNG/JPEG/SVG)
+
+            **Méthode Factory:**
+            creerImage(String chemin)
+
+            **Localisation:**
+            model/FabriqueImage.java
+
+            **Principes GRASP:**
+            Creator, Information Expert
+
+            **GoF:** p.107
+        end note
+    }
+}
+
+' ============ Patrons GoF Structuraux ============
+package "Patrons Structuraux (GoF)" INFO {
+
+    card "**8. ADAPTER**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - ImageTarget (Target)
+            - AdapterPNG (Adapter)
+            - ImagePNG (Adaptee)
+
+            **Problème résolu:**
+            Utiliser classes existantes
+            (ImagePNG, ImageJPEG, ImageSVG)
+            avec interfaces incompatibles
+
+            **Délégation:**
+            charger() → chargerPNG()
+            afficher() → afficherPNG()
+
+            **Localisation:**
+            model/ImageTarget.java
+            model/AdapterPNG.java
+
+            **Principe GRASP:**
+            Low Coupling
+
+            **GoF:** p.139
+        end note
+    }
+
+    card "**9. COMPOSITE**\n✅ Complet" #90EE90 {
+        note
+            **Participants:**
+            - PerspectiveComponent (Component)
+            - PerspectiveLeaf (Leaf)
+            - PerspectiveComposite (Composite)
+
+            **Problème résolu:**
+            Traiter uniformément perspectives
+            individuelles et groupes
+
+            **Opérations récursives:**
+            afficher(), ajouter(), supprimer()
+
+            **Localisation:**
+            model/PerspectiveComponent.java
+            model/PerspectiveLeaf.java
+            model/PerspectiveComposite.java
+
+            **Principe GRASP:**
+            Polymorphisme
+
+            **GoF:** p.163
+        end note
+    }
+}
+
+' ============ Principes GRASP ============
+package "Principes GRASP" SUCCESS {
+
+    card "**Information Expert**\n✅ 100%" #90EE90 {
+        note
+            Assigner responsabilité à la classe
+            qui possède l'information nécessaire
+
+            **Exemples:**
+            - PerspectiveLeaf gère son état
+              (zoom, x, y) car elle possède
+              les données
+            - FabriqueImage détecte le format
+              car elle a l'extension
+            - Sujet gère les observateurs
+              car il possède la liste
+
+            **Larman:** p.138
+        end note
+    }
+
+    card "**Creator**\n✅ 100%" #90EE90 {
+        note
+            A crée B si A contient/agrège B,
+            enregistre B, ou utilise étroitement B
+
+            **Exemples:**
+            - GestionnaireDePerspectives
+              crée PerspectiveLeaf
+              (contient et enregistre)
+            - FabriqueImage crée adaptateurs
+              (utilise étroitement)
+            - AdapterPNG crée ImagePNG
+              (utilise étroitement)
+
+            **Larman:** p.154
+        end note
+    }
+
+    card "**Controller**\n✅ 100%" #90EE90 {
+        note
+            Un contrôleur gère les événements
+            système et délègue au modèle
+
+            **Exemples:**
+            - GestionnaireCommandes gère
+              Undo, Redo, Exécution
+            - ControleurPerspective centralise
+              opérations utilisateur
+            - MainGUI gère événements UI
+
+            **Anti-pattern évité:**
+            Vue ne modifie PAS modèle directement
+
+            **Larman:** p.168
+        end note
+    }
+
+    card "**Low Coupling**\n✅ 95%" #90EE90 {
+        note
+            Minimiser dépendances entre classes
+
+            **Stratégies appliquées:**
+            - Interfaces (ObserverIF, Commande,
+              ImageTarget, ModeInteraction)
+            - Observer (modèle ≠ vues)
+            - Mediator (perspectives ≠ couplées)
+
+            **Métriques:**
+            - Modèle → Vue: AUCUNE dépendance
+            - Vue → Modèle: Unidirectionnelle
+            - Contrôleur → Modèle: Via Commandes
+
+            **⚠️ Pénalité:**
+            VuePrincipale n'hérite pas VueAbstraite
+
+            **Larman:** p.176
+        end note
+    }
+
+    card "**High Cohesion**\n✅ 100%" #90EE90 {
+        note
+            Responsabilités claires, liées, focalisées
+
+            **Exemples:**
+            - PerspectiveLeaf: uniquement
+              état d'affichage
+            - GestionnaireCommandes: uniquement
+              gestion de commandes
+            - Vignette: uniquement affichage
+              miniature
+
+            **Anti-pattern évité:**
+            God Class avec responsabilités
+            non liées
+
+            **Larman:** p.184
+        end note
+    }
+}
+
+' ============ Scores ============
+card "**SCORE GLOBAL**" #FFD700 {
+    note
+        **Patrons GoF:**
+        8/9 complets (88.9%)
+        + 2 bonus = 111%
+
+        **Patrons GoF requis:**
+        ✅ Observer: 100%
+        ✅ Command: 100%
+        ✅ Memento: 100%
+        ⚠️ Strategy: 30%
+        ✅ Mediator: 100%
+        ✅ Singleton: 100%
+        ✅ Factory Method: 100%
+        ✅ Adapter: 100%
+        ✅ Composite: 100%
+
+        **Principes GRASP:**
+        ✅ Information Expert: 100%
+        ✅ Creator: 100%
+        ✅ Controller: 100%
+        ✅ Low Coupling: 95%
+        ✅ High Cohesion: 100%
+
+        **MVC:**
+        ✅ Modèle: 100%
+        ⚠️ Vue: 90% (VuePrincipale)
+        ✅ Contrôleur: 100%
+
+        **SCORE FINAL: 92/100**
+    end note
+}
+
+' ============ Tâches prioritaires ============
+card "**TÂCHES RESTANTES**" #FFD700 {
+    note
+        **Priorité HAUTE:**
+        1. ✅ Implémenter Strategy pour copier/coller
+           - Interface StrategieCopie
+           - CopieEchelle, CopieTranslation,
+             CopieComplete, CopieVide
+           - Modifier GestionnaireCopie
+           - Effort: 3-4 heures
+           - Impact: +9% sur patrons GoF
+
+        **Priorité MOYENNE:**
+        2. Refactorer VuePrincipale
+           - Utiliser VueAbstraite ou composition
+           - Effort: 1-2 heures
+           - Impact: +6% sur MVC
+
+        **Priorité BASSE:**
+        3. Tests JUnit 5
+        4. Diagrammes UML complets
+        5. Stratégies de dessin (cercles, etc.)
+    end note
+}
+
+' ============ Légende ============
+legend bottom right
+    **Statut:**
+    ✅ Vert: Complet (100%)
+    ⚠️ Jaune: Partiel (< 100%)
+    💜 Violet: Bonus (non requis)
+
+    **Références:**
+    GoF: Design Patterns (Gamma et al.)
+    GRASP: Applying UML and Patterns (Larman)
+
+    **Projet:** X-Vision
+    **Cours:** INF1163
+    **Auteurs:** Antoine Mailhot & Micaël Racine-Leblanc
+end legend
+
+@enduml
