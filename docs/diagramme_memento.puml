@@ -9,37 +9,74 @@
 
 title X-Vision - Diagramme de classes : Patron Memento (Undo / Redo)
 
-class Perspective {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
-    +creerMemento() : MementoPerspective
-    +restaurer(m : MementoPerspective) : void
+class PerspectiveLeaf {
+    -idPerspective : int
+    -gestionnaireMemento : GestionnaireMemento
+    -zoom : double
+    -x : double
+    -y : double
+    -cheminImage : String
+    -crop : Crop
+    +creerMemento() : PerspectiveMemento
+    +restaurerDepuisMemento(m : PerspectiveMemento) : void
+    +undo() : void
+    +redo() : void
+    +exporterEnJSON() : String
 }
 
-class MementoPerspective {
-    -etatZoom : double
-    -etatX : double
-    -etatY : double
-    +MementoPerspective(zoom : double, x : double, y : double)
+class PerspectiveMemento {
+    -{final} idPerspective : int
+    -{final} zoom : double
+    -{final} x : double
+    -{final} y : double
+    -{final} imageBase64 : String
+    -{final} crops : List<Crop>
+    -{final} annotations : List<String>
+    -{final} etatJSON : String
+    +PerspectiveMemento(id, zoom, x, y, img, crops, annot, json)
     +getZoom() : double
     +getX() : double
     +getY() : double
+    +getImageBase64() : String
+    +getCrops() : List<Crop>
+    +getAnnotations() : List<String>
+    +exporterEnJSON() : String
+    +{static} fromJSON(json : String, id : int) : PerspectiveMemento
 }
 
-class Historique {
-    -pileUndo : Stack<MementoPerspective>
-    -pileRedo : Stack<MementoPerspective>
-    +sauvegarderEtat(m : MementoPerspective) : void
-    +annuler(p : Perspective) : void
-    +refaire(p : Perspective) : void
+class GestionnaireMemento {
+    -pileUndo : Stack<PerspectiveMemento>
+    -pileRedo : Stack<PerspectiveMemento>
+    +sauvegarder(m : PerspectiveMemento) : void
+    +undo() : PerspectiveMemento
+    +redo() : PerspectiveMemento
+    +getHistorique() : List<PerspectiveMemento>
+    +peutUndo() : boolean
+    +peutRedo() : boolean
 }
 
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
-Perspective --> MementoPerspective : crée / restaure
-Historique --> MementoPerspective : stocke
-Historique --> Perspective : modifie
+PerspectiveLeaf --> GestionnaireMemento : utilise (Caretaker)
+PerspectiveLeaf ..> PerspectiveMemento : <<create>>
+GestionnaireMemento o-- PerspectiveMemento : stocke >
+
+note right of PerspectiveMemento
+    **Patron Memento (GoF)**
+    - Memento: PerspectiveMemento
+      (immuable - tous les champs final)
+    - Originator: PerspectiveLeaf
+    - Caretaker: GestionnaireMemento
+
+    **Avantages:**
+    - Encapsulation préservée
+    - Historique Undo/Redo
+    - Persistance JSON
+
+    **GRASP: Low Coupling**
+    Le Caretaker ne connaît pas
+    l'interne de PerspectiveLeaf
+end note
 
 @enduml

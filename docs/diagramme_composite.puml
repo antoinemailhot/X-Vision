@@ -17,15 +17,30 @@ interface PerspectiveComponent {
     +getEnfants() : List<PerspectiveComponent>
 }
 
+' Classe de base pour les sujets observables
+abstract class Sujet {
+    -observateurs : List<ObserverIF>
+    +attacher(o : ObserverIF) : void
+    +detacher(o : ObserverIF) : void
+    #notifier() : void
+    +getNombreObservateurs() : int
+}
+
 ' Feuille : Perspective simple
 class PerspectiveLeaf implements PerspectiveComponent {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
+    -idPerspective : int
+    -gestionnaireMemento : GestionnaireMemento
+    -zoom : double
+    -x : double
+    -y : double
+    -cheminImage : String
+    -crop : Crop
     +afficher() : void
     +ajouter(p : PerspectiveComponent) : void
     +supprimer(p : PerspectiveComponent) : void
     +getEnfants() : List<PerspectiveComponent>
+    +setZoom(zoom : double) : void
+    +setCentre(x : double, y : double) : void
 }
 
 ' Composite : Perspective composée
@@ -37,11 +52,44 @@ class PerspectiveComposite implements PerspectiveComponent {
     +getEnfants() : List<PerspectiveComponent>
 }
 
+' Gestionnaire de perspectives
+class GestionnaireDePerspectives {
+    -perspectives : Map<String, PerspectiveComponent>
+    +ajouterPerspectiveSimple(zoom : double, x : double, y : double) : PerspectiveLeaf
+    +ajouterPerspectiveComposite() : PerspectiveComposite
+    +sauvegarderPerspective(id : String, chemin : String) : void
+    +chargerPerspective(chemin : String) : PerspectiveComponent
+    +getPerspective(id : String) : PerspectiveComponent
+}
+
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
 PerspectiveLeaf ..|> PerspectiveComponent
+PerspectiveLeaf --|> Sujet
 PerspectiveComposite ..|> PerspectiveComponent
-PerspectiveComposite --> PerspectiveComponent : contient
+PerspectiveComposite o-- PerspectiveComponent : contient >
+GestionnaireDePerspectives o-- PerspectiveComponent : gère >
+
+note right of PerspectiveComponent
+    **Patron Composite (GoF)**
+    - Component: PerspectiveComponent
+    - Leaf: PerspectiveLeaf
+    - Composite: PerspectiveComposite
+    - Client: GestionnaireDePerspectives
+
+    **Avantages:**
+    - Traiter uniformément individus
+      et groupes
+    - Arborescence de perspectives
+    - Opérations récursives
+
+    **GRASP: Polymorphisme**
+    Traitement uniforme via interface
+
+    **GRASP: Creator**
+    GestionnaireDePerspectives
+    crée les perspectives
+end note
 
 @enduml

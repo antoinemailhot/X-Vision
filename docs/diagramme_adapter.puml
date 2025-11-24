@@ -13,55 +13,117 @@ title X-Vision - Diagramme de classes : Patron Adapter
 interface ImageTarget {
     +charger(chemin : String) : void
     +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-' Classe existante pour les images PNG
+' Adaptees existants
 class ImagePNG {
     +chargerPNG(chemin : String) : void
     +afficherPNG() : void
+    +getWidth() : int
+    +getHeight() : int
+    +getPixels() : byte[]
 }
 
-' Classe existante pour les images JPEG
 class ImageJPEG {
     +chargerJPEG(chemin : String) : void
     +afficherJPEG() : void
+    +getWidth() : int
+    +getHeight() : int
+    +getPixels() : byte[]
 }
 
-' Classe existante pour les images SVG
 class ImageSVG {
     +chargerSVG(chemin : String) : void
     +afficherSVG() : void
+    +getWidth() : int
+    +getHeight() : int
+    +getPixels() : byte[]
 }
 
-' Adapter pour PNG
+' Adapters
 class AdapterPNG implements ImageTarget {
     -adaptee : ImagePNG
+    +AdapterPNG()
     +charger(chemin : String) : void
     +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-' Adapter pour JPEG
 class AdapterJPEG implements ImageTarget {
     -adaptee : ImageJPEG
+    +AdapterJPEG()
     +charger(chemin : String) : void
     +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-' Adapter pour SVG
 class AdapterSVG implements ImageTarget {
     -adaptee : ImageSVG
+    +AdapterSVG()
     +charger(chemin : String) : void
     +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
+}
+
+' Factory pour créer les adaptateurs
+class FabriqueImage {
+    +{static} creerImage(chemin : String) : ImageTarget
+    -{static} detecterFormat(chemin : String) : FormatImage
+    -{static} creerAdaptateur(format : FormatImage, chemin : String) : ImageTarget
+}
+
+enum FormatImage {
+    PNG
+    JPEG
+    JPG
+    SVG
+    INCONNU
 }
 
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
-AdapterPNG --> ImagePNG : utilise
-AdapterJPEG --> ImageJPEG : utilise
-AdapterSVG --> ImageSVG : utilise
 AdapterPNG ..|> ImageTarget
 AdapterJPEG ..|> ImageTarget
 AdapterSVG ..|> ImageTarget
+
+AdapterPNG o-- ImagePNG : adapte >
+AdapterJPEG o-- ImageJPEG : adapte >
+AdapterSVG o-- ImageSVG : adapte >
+
+FabriqueImage ..> ImageTarget : <<create>>
+FabriqueImage ..> FormatImage : <<use>>
+FabriqueImage ..> AdapterPNG : <<create>>
+FabriqueImage ..> AdapterJPEG : <<create>>
+FabriqueImage ..> AdapterSVG : <<create>>
+
+note right of ImageTarget
+    **Patron Adapter (GoF)**
+    - Target: ImageTarget
+    - Adapters: AdapterPNG, AdapterJPEG, AdapterSVG
+    - Adaptees: ImagePNG, ImageJPEG, ImageSVG
+
+    **Combiné avec Factory Method:**
+    FabriqueImage détecte le format
+    et crée l'adaptateur approprié
+
+    **Avantages:**
+    - Interface uniforme pour tous formats
+    - Réutilisation classes existantes
+    - Ajout nouveaux formats facile
+
+    **GRASP: Low Coupling**
+    Client utilise ImageTarget,
+    pas les classes concrètes
+end note
 
 @enduml

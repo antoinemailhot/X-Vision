@@ -2,61 +2,261 @@
 ' =====================================================
 ' DIAGRAMME DE CLASSES - PRINCIPES GRASP
 ' Projet : X-Vision
-' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc
 ' Description : Application des principes GRASP
 '               (faible couplage, forte cohésion, expert en information)
 ' =====================================================
 
 title X-Vision - Diagramme de classes : Principes GRASP
 
-' Exemple de Modèle
-class Image {
-    -cheminFichier : String
-    -format : String
-    +charger() : void
-    +sauvegarder() : void
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' ============ INFORMATION EXPERT ============
+package "Information Expert" #E8F5E9 {
+    class PerspectiveLeaf {
+        -zoom : double
+        -x : double
+        -y : double
+        -crop : Crop
+        +setZoom(zoom : double) : void
+        +setCentre(x : double, y : double) : void
+        +getZoom() : double
+        +getX() : double
+        +getY() : double
+    }
+
+    note right of PerspectiveLeaf
+        **GRASP: Information Expert**
+        PerspectiveLeaf gère son propre état
+        (zoom, x, y, crop) car elle possède
+        ces informations.
+
+        Elle est l'expert pour:
+        - Modifier son zoom
+        - Modifier sa position
+        - Créer son memento
+    end note
+
+    class Sujet {
+        -observateurs : List<ObserverIF>
+        +attacher(o : ObserverIF) : void
+        +detacher(o : ObserverIF) : void
+        #notifier() : void
+        +getNombreObservateurs() : int
+    }
+
+    note right of Sujet
+        **GRASP: Information Expert**
+        Sujet gère la liste d'observateurs
+        car il possède cette liste.
+
+        Il est l'expert pour:
+        - Attacher/détacher observateurs
+        - Notifier les observateurs
+    end note
 }
 
-class Perspective {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
-    +afficher() : void
+' ============ CREATOR ============
+package "Creator" #FFF9C4 {
+    class GestionnaireDePerspectives {
+        -perspectives : Map<String, PerspectiveComponent>
+        +ajouterPerspectiveSimple(zoom, x, y) : PerspectiveLeaf
+        +ajouterPerspectiveComposite() : PerspectiveComposite
+        +sauvegarderPerspective(id, chemin) : void
+        +chargerPerspective(chemin) : PerspectiveComponent
+    }
+
+    note right of GestionnaireDePerspectives
+        **GRASP: Creator**
+        GestionnaireDePerspectives crée
+        les PerspectiveLeaf car il:
+        - Contient les perspectives
+        - Enregistre les perspectives
+        - Utilise étroitement perspectives
+    end note
+
+    class FabriqueImage {
+        +{static} creerImage(chemin : String) : ImageTarget
+        -{static} detecterFormat(chemin : String) : FormatImage
+    }
+
+    note right of FabriqueImage
+        **GRASP: Creator**
+        FabriqueImage crée les adaptateurs
+        (AdapterPNG, AdapterJPEG, AdapterSVG)
+        car elle:
+        - Connaît les types d'adaptateurs
+        - Possède les infos (extension fichier)
+        - Utilise étroitement adaptateurs
+    end note
 }
 
-' Controller central
-class ControleurPerspective {
-    +zoom(p : Perspective, facteur : double) : void
-    +translater(p : Perspective, dx : double, dy : double) : void
+' ============ CONTROLLER ============
+package "Controller" #E3F2FD {
+    class ControleurPerspective {
+        -gestionnairePerspectives : GestionnaireDePerspectives
+        +creerPerspective(zoom, x, y) : PerspectiveLeaf
+        +zoomerAvecFacteur(p, facteur) : void
+        +deplacerDelta(p, dx, dy) : void
+        +sauvegarderPerspectiveActuelle(chemin) : void
+        +chargerPerspective(chemin) : PerspectiveLeaf
+    }
+
+    note right of ControleurPerspective
+        **GRASP: Controller**
+        ControleurPerspective centralise
+        les opérations utilisateur:
+        - Créer perspective
+        - Zoomer
+        - Déplacer
+        - Sauvegarder/Charger
+
+        Délègue au modèle via Commandes
+    end note
+
+    class GestionnaireCommandes <<Singleton>> {
+        -{static} instance : GestionnaireCommandes
+        -pileUndo : Stack<Commande>
+        -pileRedo : Stack<Commande>
+        +{static} getInstance() : GestionnaireCommandes
+        +executerCommande(cmd : Commande) : void
+        +undo() : void
+        +redo() : void
+    }
+
+    note right of GestionnaireCommandes
+        **GRASP: Controller**
+        GestionnaireCommandes gère
+        les événements système:
+        - Exécution commandes
+        - Undo/Redo global
+        - Historique actions
+    end note
 }
 
-' Gestion de commandes et undo/redo
-class GestionnaireCommandes {
-    -historique : List<Commande>
-    +executer(c : Commande) : void
-    +undo() : void
-    +redo() : void
+' ============ LOW COUPLING ============
+package "Low Coupling" #FCE4EC {
+    interface ObserverIF {
+        +actualiser() : void
+    }
+
+    abstract class VueAbstraite {
+        #sujetObserve : Sujet
+        +setSujet(s : Sujet) : void
+        +{final} actualiser() : void
+        #{abstract} rafraichir() : void
+    }
+
+    interface Commande {
+        +executer() : void
+        +annuler() : void
+    }
+
+    interface ImageTarget {
+        +charger(chemin : String) : void
+        +afficher() : void
+    }
+
+    note bottom of ObserverIF
+        **GRASP: Low Coupling**
+        Interfaces réduisent couplage:
+        - Modèle ne connaît pas vues concrètes
+        - Utilise ObserverIF seulement
+        - Facile d'ajouter nouvelles vues
+    end note
 }
 
-' Observateur / Vue
-class VuePerspective {
-    +mettreAJour() : void
+' ============ HIGH COHESION ============
+package "High Cohesion" #FFE0B2 {
+    class GestionnaireMemento {
+        -pileUndo : Stack<PerspectiveMemento>
+        -pileRedo : Stack<PerspectiveMemento>
+        +sauvegarder(m : PerspectiveMemento) : void
+        +undo() : PerspectiveMemento
+        +redo() : PerspectiveMemento
+    }
+
+    class GestionnaireAnnotations {
+        -annotations : List<Annotation>
+        +ajouter(a : Annotation) : void
+        +supprimer(a : Annotation) : void
+        +effacerTout() : void
+    }
+
+    class GestionnaireCrop {
+        -cropActuel : Crop
+        +definirCrop(zone : Rectangle) : void
+        +getZoneCrop() : Rectangle
+        +hasCrop() : boolean
+    }
+
+    note bottom of GestionnaireMemento
+        **GRASP: High Cohesion**
+        Chaque gestionnaire a des
+        responsabilités claires et liées:
+        - GestionnaireMemento: Undo/Redo SEULEMENT
+        - GestionnaireAnnotations: Annotations SEULEMENT
+        - GestionnaireCrop: Crop SEULEMENT
+
+        Aucune responsabilité non liée!
+    end note
 }
 
 ' =====================================================
-' APPLICATION DES PRINCIPES GRASP
+' RELATIONS
 ' =====================================================
-' Information Expert : Perspective sait gérer son état (zoom, position)
-Perspective --> VuePerspective : notifie (Observer)
 
-' Low Coupling / High Cohesion :
-ControleurPerspective --> Perspective
-ControleurPerspective --> GestionnaireCommandes
+' Information Expert
+PerspectiveLeaf --|> Sujet
 
-' Creator : GestionnaireCommandes crée les objets Commande
-GestionnaireCommandes --> Commande
+' Creator
+GestionnaireDePerspectives ..> PerspectiveLeaf : <<create>>
+FabriqueImage ..> ImageTarget : <<create>>
 
-' Controller : ControleurPerspective centralise les opérations utilisateur
-ControleurPerspective --> VuePerspective
+' Controller
+ControleurPerspective --> GestionnaireDePerspectives : utilise >
+ControleurPerspective ..> Commande : <<create>>
+GestionnaireCommandes --> Commande : gère >
+
+' Low Coupling
+VueAbstraite ..|> ObserverIF
+VueAbstraite --> Sujet : observe >
+Sujet --> ObserverIF : notifie >
+
+' High Cohesion (composition)
+PerspectiveLeaf --> GestionnaireMemento : utilise >
+
+' =====================================================
+' LÉGENDE
+' =====================================================
+legend bottom right
+    **Principes GRASP Appliqués:**
+
+    **1. Information Expert**
+    - PerspectiveLeaf gère son état
+    - Sujet gère ses observateurs
+
+    **2. Creator**
+    - GestionnaireDePerspectives crée perspectives
+    - FabriqueImage crée adaptateurs
+
+    **3. Controller**
+    - ControleurPerspective centralise opérations UI
+    - GestionnaireCommandes gère événements système
+
+    **4. Low Coupling**
+    - Interfaces (ObserverIF, Commande, ImageTarget)
+    - Patron Observer (modèle ≠ vues)
+    - Patron Mediator (perspectives ≠ couplées)
+
+    **5. High Cohesion**
+    - Gestionnaires spécialisés
+    - Responsabilités claires et liées
+    - Pas de classes "fourre-tout"
+
+    **Référence:** Larman, Craig - Applying UML and Patterns
+end legend
 
 @enduml

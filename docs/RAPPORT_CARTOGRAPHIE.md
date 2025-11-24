@@ -142,7 +142,7 @@ src/xvision/
 
 ---
 
-## 🏗️ ARCHITECTURE MVC DÉTAILLÉE
+## ARCHITECTURE MVC DÉTAILLÉE
 
 ### 1. Modèle (xvision/model/)
 
@@ -656,7 +656,7 @@ Les contrôleurs gèrent les événements et modifient le modèle via des Comman
 
 ---
 
-## 🎯 PATRONS DE CONCEPTION GOF
+##  PATRONS DE CONCEPTION GOF
 
 ### Vue d'ensemble
 

@@ -2,66 +2,237 @@
 ' =====================================================
 ' DIAGRAMME DE CLASSES - PATRON STRATEGY
 ' Projet : X-Vision
-' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
-' Description : Implémentation du patron Strategy pour
-'               le copier/coller des paramètres d’affichage.
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc
+' Description : Architecture planifiée pour le copier/coller
+'               avec stratégies interchangeables.
+'               ⚠️ IMPLÉMENTATION PARTIELLE (30%)
 ' =====================================================
 
-title X-Vision - Diagramme de classes : Patron Strategy (Copier/Coller des paramètres)
+title X-Vision - Diagramme de classes : Patron Strategy (Copier/Coller - ARCHITECTURE PLANIFIÉE)
 
-interface StrategieCopie {
-    +copier(p : Perspective) : ParametresAffichage
-    +coller(p : Perspective, param : ParametresAffichage) : void
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+' ============ ARCHITECTURE PLANIFIÉE (NON IMPLÉMENTÉE) ============
+package "Architecture Planifiée ⚠️ À IMPLÉMENTER" #FFE0B2 {
+
+    interface StrategieCopie {
+        +copier(source : PerspectiveLeaf) : ParametresAffichage
+        +coller(cible : PerspectiveLeaf, param : ParametresAffichage) : void
+    }
+
+    class CopieEchelle {
+        +copier(source : PerspectiveLeaf) : ParametresAffichage
+        +coller(cible : PerspectiveLeaf, param : ParametresAffichage) : void
+    }
+
+    class CopieTranslation {
+        +copier(source : PerspectiveLeaf) : ParametresAffichage
+        +coller(cible : PerspectiveLeaf, param : ParametresAffichage) : void
+    }
+
+    class CopieComplete {
+        +copier(source : PerspectiveLeaf) : ParametresAffichage
+        +coller(cible : PerspectiveLeaf, param : ParametresAffichage) : void
+    }
+
+    class CopieVide {
+        +copier(source : PerspectiveLeaf) : ParametresAffichage
+        +coller(cible : PerspectiveLeaf, param : ParametresAffichage) : void
+    }
+
+    class GestionnaireCopie {
+        -mediator : MediatorCopie
+        -strategie : StrategieCopie
+        +GestionnaireCopie()
+        +definirStrategie(s : StrategieCopie) : void
+        +copier(source : PerspectiveLeaf) : void
+        +coller(cible : PerspectiveLeaf) : void
+    }
+
+    class ParametresAffichage {
+        +zoom : double
+        +x : double
+        +y : double
+        +ParametresAffichage(zoom : double, x : double, y : double)
+    }
+
+    StrategieCopie <|.. CopieEchelle
+    StrategieCopie <|.. CopieTranslation
+    StrategieCopie <|.. CopieComplete
+    StrategieCopie <|.. CopieVide
+    GestionnaireCopie --> StrategieCopie : utilise >
+    GestionnaireCopie ..> ParametresAffichage : <<create>>
+
+    note right of StrategieCopie
+        **⚠️ STATUT: NON IMPLÉMENTÉ (0%)**
+
+        Cette architecture est PLANIFIÉE
+        mais pas encore codée.
+
+        **À FAIRE:**
+        1. Créer interface StrategieCopie
+        2. Implémenter 4 stratégies concrètes
+        3. Ajouter definirStrategie() à
+           GestionnaireCopie
+        4. Créer classe ParametresAffichage
+
+        **Estimation:** 3-4 heures
+    end note
 }
 
-class CopieEchelle implements StrategieCopie {
-    +copier(p : Perspective) : ParametresAffichage
-    +coller(p : Perspective, param : ParametresAffichage) : void
+' ============ IMPLÉMENTATION ACTUELLE ============
+package "Implémentation Actuelle (30%)" #E8F5E9 {
+    class MediatorCopie {
+        -source : PerspectiveLeaf
+        -cible : PerspectiveLeaf
+        +notifier(source : Object, evt : String, data : Object) : void
+    }
+
+    class "GestionnaireCopie\n(actuel)" as GC_Actuel {
+        -mediator : MediatorCopie
+        +copier(source : PerspectiveLeaf) : void
+        +coller(cible : PerspectiveLeaf) : void
+    }
+
+    class PerspectiveLeaf {
+        -zoom : double
+        -x : double
+        -y : double
+        +getZoom() : double
+        +getX() : double
+        +getY() : double
+        +setZoom(zoom : double) : void
+        +setCentre(x : double, y : double) : void
+    }
+
+    GC_Actuel --> MediatorCopie : utilise >
+    MediatorCopie --> PerspectiveLeaf : coordonne >
+
+    note right of MediatorCopie
+        **IMPLÉMENTATION ACTUELLE:**
+        - Copie seulement position (x, y)
+        - Pas de stratégies interchangeables
+        - Pas de choix zoom/position/tout
+
+        **LIMITATION:**
+        Toujours copie la même chose!
+        Pas de flexibilité.
+    end note
 }
 
-class CopieTranslation implements StrategieCopie {
-    +copier(p : Perspective) : ParametresAffichage
-    +coller(p : Perspective, param : ParametresAffichage) : void
+GestionnaireCopie .down.> GC_Actuel : remplacera >
+
+' ============ EXEMPLE STRATEGY IMPLÉMENTÉ (BONUS) ============
+package "Strategy Implémenté Ailleurs (BONUS)" #E3F2FD {
+    interface OutilDessin {
+        +onMousePressed(e : MouseEvent) : void
+        +onMouseDragged(e : MouseEvent) : void
+        +onMouseReleased(e : MouseEvent) : void
+        +getAnnotationPreview() : Annotation
+        +getAnnotationFinale() : Annotation
+    }
+
+    class OutilLigne {
+        -couleur : Color
+        -epaisseur : int
+        -annotationPreview : AnnotationLigne
+        +onMousePressed(e : MouseEvent) : void
+        +onMouseDragged(e : MouseEvent) : void
+        +onMouseReleased(e : MouseEvent) : void
+    }
+
+    class OutilCrop {
+        -rectanglePreview : Rectangle
+        +onMousePressed(e : MouseEvent) : void
+        +onMouseDragged(e : MouseEvent) : void
+        +onMouseReleased(e : MouseEvent) : void
+    }
+
+    class ModeLigne {
+        -outil : OutilDessin
+        +activer(panel : JPanel, contexte : ContexteMode) : void
+    }
+
+    OutilDessin <|.. OutilLigne
+    OutilDessin <|.. OutilCrop
+    ModeLigne --> OutilDessin : utilise >
+
+    note bottom of OutilDessin
+        **✅ STRATEGY IMPLÉMENTÉ**
+
+        Patron Strategy appliqué pour
+        les outils de dessin:
+        - OutilLigne (dessiner lignes)
+        - OutilCrop (sélectionner zone)
+
+        **GRASP: Polymorphisme**
+        Traitement uniforme via interface
+
+        **Preuve que Strategy fonctionne
+        dans le projet!**
+    end note
 }
 
-class CopieComplete implements StrategieCopie {
-    +copier(p : Perspective) : ParametresAffichage
-    +coller(p : Perspective, param : ParametresAffichage) : void
-}
+' ============ NOTES GÉNÉRALES ============
+note as N1
+    **PATRON STRATEGY (GoF)**
 
-class CopieVide implements StrategieCopie {
-    +copier(p : Perspective) : ParametresAffichage
-    +coller(p : Perspective, param : ParametresAffichage) : void
-}
+    **Définition:**
+    Définir une famille d'algorithmes,
+    encapsuler chacun, et les rendre
+    interchangeables.
 
-class GestionnaireCopie {
-    -strategie : StrategieCopie
-    +definirStrategie(s : StrategieCopie) : void
-    +executerCopie(p : Perspective) : ParametresAffichage
-    +executerColler(p : Perspective, param : ParametresAffichage) : void
-}
+    **Participants:**
+    - Strategy: StrategieCopie
+    - ConcreteStrategy: CopieEchelle,
+      CopieTranslation, CopieComplete, CopieVide
+    - Context: GestionnaireCopie
 
-class Perspective {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
-}
+    **Avantages:**
+    ✅ Évite if/else pour choix algorithme
+    ✅ Stratégies interchangeables à runtime
+    ✅ Facilite ajout nouvelles stratégies
+    ✅ Respecte Open/Closed Principle
 
-class ParametresAffichage {
-    +zoom : double
-    +x : double
-    +y : double
-}
+    **GRASP: Polymorphisme**
+    Utiliser polymorphisme pour
+    varier comportement
 
-' =====================================================
-' RELATIONS ENTRE LES CLASSES
-' =====================================================
-GestionnaireCopie --> StrategieCopie : utilise
-StrategieCopie <|.. CopieEchelle
-StrategieCopie <|.. CopieTranslation
-StrategieCopie <|.. CopieComplete
-StrategieCopie <|.. CopieVide
-GestionnaireCopie --> Perspective
-GestionnaireCopie --> ParametresAffichage
+    **Référence GoF:** p.315
+end note
+
+note as N2
+    **PLAN D'IMPLÉMENTATION**
+
+    **Étape 1:** Interface StrategieCopie
+    ```java
+    public interface StrategieCopie {
+        ParametresAffichage copier(PerspectiveLeaf p);
+        void coller(PerspectiveLeaf p, ParametresAffichage param);
+    }
+    ```
+
+    **Étape 2:** Classe ParametresAffichage
+    ```java
+    public class ParametresAffichage {
+        public final double zoom;
+        public final double x;
+        public final double y;
+    }
+    ```
+
+    **Étape 3:** Stratégies concrètes
+    - CopieEchelle: copie zoom seulement
+    - CopieTranslation: copie x, y seulement
+    - CopieComplete: copie zoom + x + y
+    - CopieVide: ne copie rien (null object)
+
+    **Étape 4:** Modifier GestionnaireCopie
+    Ajouter: `definirStrategie(StrategieCopie s)`
+
+    **Étape 5:** Tests
+    Tester chaque stratégie séparément
+end note
 
 @enduml

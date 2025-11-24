@@ -9,43 +9,96 @@
 
 title X-Vision - Diagramme de classes : Patron Factory Method
 
-' Interface pour les objets créés
-interface Produit {
-}
-
-class Perspective implements Produit {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
+' Interface pour les produits (images)
+interface ImageTarget {
+    +charger(chemin : String) : void
     +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-class Image implements Produit {
-    -cheminFichier : String
-    -format : String
-    +charger() : void
-    +sauvegarder() : void
+' Produits concrets (Adapters)
+class AdapterPNG implements ImageTarget {
+    -adaptee : ImagePNG
+    +charger(chemin : String) : void
+    +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-' Interface de la Factory
-interface Fabrique {
-    +creerProduit(type : String) : Produit
+class AdapterJPEG implements ImageTarget {
+    -adaptee : ImageJPEG
+    +charger(chemin : String) : void
+    +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-class FabriquePerspective implements Fabrique {
-    +creerProduit(type : String) : Produit
+class AdapterSVG implements ImageTarget {
+    -adaptee : ImageSVG
+    +charger(chemin : String) : void
+    +afficher() : void
+    +getLargeur() : int
+    +getHauteur() : int
+    +getDonneesPixels() : byte[]
 }
 
-class FabriqueImage implements Fabrique {
-    +creerProduit(type : String) : Produit
+' Creator (Factory)
+class FabriqueImage {
+    +{static} creerImage(chemin : String) : ImageTarget
+    -{static} detecterFormat(chemin : String) : FormatImage
+    -{static} creerAdaptateur(format : FormatImage, chemin : String) : ImageTarget
+}
+
+enum FormatImage {
+    PNG
+    JPEG
+    JPG
+    SVG
+    INCONNU
 }
 
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
-Fabrique <|.. FabriquePerspective
-Fabrique <|.. FabriqueImage
-Perspective ..|> Produit
-Image ..|> Produit
+ImageTarget <|.. AdapterPNG
+ImageTarget <|.. AdapterJPEG
+ImageTarget <|.. AdapterSVG
+
+FabriqueImage ..> ImageTarget : <<create>>
+FabriqueImage ..> FormatImage : <<use>>
+FabriqueImage ..> AdapterPNG : <<create>>
+FabriqueImage ..> AdapterJPEG : <<create>>
+FabriqueImage ..> AdapterSVG : <<create>>
+
+note right of FabriqueImage
+    **Patron Factory Method (GoF)**
+    - Creator: FabriqueImage
+    - Product: ImageTarget
+    - ConcreteProducts: AdapterPNG,
+      AdapterJPEG, AdapterSVG
+
+    **Méthode Factory:**
+    creerImage(String chemin)
+    - Détecte extension (.png, .jpg, .svg)
+    - Crée adaptateur approprié
+    - Retourne ImageTarget
+
+    **Avantages:**
+    - Client ne connaît pas classes concrètes
+    - Ajout nouveaux formats facile
+    - Centralisation création
+
+    **GRASP: Creator**
+    FabriqueImage crée les adaptateurs
+    car elle connaît les formats
+
+    **GRASP: Information Expert**
+    FabriqueImage détecte le format
+    car elle a le chemin du fichier
+end note
 
 @enduml

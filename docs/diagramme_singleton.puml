@@ -2,51 +2,143 @@
 ' =====================================================
 ' DIAGRAMME DE CLASSES - PATRON SINGLETON
 ' Projet : X-Vision
-' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
-' Description : Gestionnaire central unique pour
-'               l’historique des commandes et le cache.
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc
+' Description : Gestionnaire de commandes unique pour
+'               l'historique Undo/Redo centralisé.
 ' =====================================================
 
-title X-Vision - Diagramme de classes : Patron Singleton (Gestionnaire central)
+title X-Vision - Diagramme de classes : Patron Singleton (GestionnaireCommandes)
 
-class GestionnaireCentral {
-    -instance : GestionnaireCentral
-    -historique : Historique
-    -cacheImages : Map<String, Image>
-    
-    +getInstance() : GestionnaireCentral
-    +ajouterCache(cle : String, img : Image) : void
-    +recupererCache(cle : String) : Image
-    +executerCommande(cmd : Commande) : void
-    +annulerDerniereCommande() : void
-    +refaireDerniereCommande() : void
-}
+skinparam classAttributeIconSize 0
 
-class Historique {
+class GestionnaireCommandes <<Singleton>> {
+    -{static} instance : GestionnaireCommandes
     -pileUndo : Stack<Commande>
     -pileRedo : Stack<Commande>
-    +ajouterCommande(cmd : Commande) : void
-    +annulerDerniere() : void
-    +refaireDerniere() : void
+
+    -GestionnaireCommandes()
+    +{static} getInstance() : GestionnaireCommandes
+    +executerCommande(cmd : Commande) : void
+    +undo() : void
+    +redo() : void
+    +peutUndo() : boolean
+    +peutRedo() : boolean
 }
 
-class Commande {
+interface Commande {
     +executer() : void
     +annuler() : void
 }
 
-class Image {
-    -cheminFichier : String
-    -données : byte[]
-    +charger() : void
-    +sauvegarder() : void
+class CommandeZoom {
+    -perspective : PerspectiveLeaf
+    -ancienZoom : double
+    -nouveauZoom : double
+    +executer() : void
+    +annuler() : void
+}
+
+class CommandeTranslation {
+    -perspective : PerspectiveLeaf
+    -ancienneX : double
+    -ancienneY : double
+    -nouvelleX : double
+    -nouvelleY : double
+    +executer() : void
+    +annuler() : void
+}
+
+class CommandeAjouterAnnotation {
+    -gestionnaireAnnotations : GestionnaireAnnotations
+    -annotation : Annotation
+    +executer() : void
+    +annuler() : void
+}
+
+class CommandeDefinirCrop {
+    -perspective : PerspectiveLeaf
+    -ancienCrop : Crop
+    -nouveauCrop : Crop
+    +executer() : void
+    +annuler() : void
+}
+
+class PerspectiveLeaf {
+    -zoom : double
+    -x : double
+    -y : double
+    +setZoom(zoom : double) : void
+    +setCentre(x : double, y : double) : void
 }
 
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
-GestionnaireCentral --> Historique : possède
-GestionnaireCentral --> Commande : exécute
-GestionnaireCentral --> Image : gère le cache
+GestionnaireCommandes o-- Commande : gère >
+
+Commande <|.. CommandeZoom
+Commande <|.. CommandeTranslation
+Commande <|.. CommandeAjouterAnnotation
+Commande <|.. CommandeDefinirCrop
+
+CommandeZoom --> PerspectiveLeaf : modifie >
+CommandeTranslation --> PerspectiveLeaf : modifie >
+CommandeDefinirCrop --> PerspectiveLeaf : modifie >
+
+note right of GestionnaireCommandes
+    **Patron Singleton (GoF)**
+
+    **Caractéristiques:**
+    - Constructeur privé
+    - Instance statique unique
+    - getInstance() statique
+    - Accès global contrôlé
+
+    **Responsabilités:**
+    - Centralise Undo/Redo global
+    - Exécute toutes les commandes
+    - Maintient 2 piles (Undo/Redo)
+
+    **Utilisation:**
+    ```java
+    GestionnaireCommandes gc =
+        GestionnaireCommandes.getInstance();
+    gc.executerCommande(new CommandeZoom(...));
+    gc.undo(); // Annule dernière commande
+    gc.redo(); // Refait commande annulée
+    ```
+
+    **GRASP: Controller**
+    Gère les événements système
+
+    **Combiné avec Command (GoF)**
+    Invoker du patron Command
+end note
+
+note bottom of Commande
+    **Patron Command (GoF)**
+
+    Chaque commande encapsule:
+    - L'action à effectuer (executer)
+    - Comment l'annuler (annuler)
+    - L'état précédent (pour Undo)
+
+    Toutes les modifications du modèle
+    passent par des Commandes!
+end note
+
+note as N1
+    **POURQUOI SINGLETON?**
+
+    ✅ Une seule pile Undo/Redo pour toute l'application
+    ✅ Évite incohérences (multiples historiques)
+    ✅ Accès facile depuis n'importe quel contrôleur
+    ✅ Garantit ordre chronologique global
+
+    **ALTERNATIVE REJETÉE:**
+    Multiple GestionnaireCommandes par vue
+    ❌ Historiques fragmentés
+    ❌ Undo/Redo incohérent entre vues
+end note
 
 @enduml

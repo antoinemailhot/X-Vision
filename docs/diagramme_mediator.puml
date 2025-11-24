@@ -10,46 +10,65 @@
 title X-Vision - Diagramme de classes : Patron Mediator (Copier/Coller)
 
 interface Mediator {
-    +copier(source : Perspective) : void
-    +coller(cible : Perspective) : void
+    +notifier(source : Object, evenement : String, data : Object) : void
 }
 
 class MediatorCopie implements Mediator {
-    -gestionnaireCopie : GestionnaireCopie
-    -dernierParametres : ParametresAffichage
-    +copier(source : Perspective) : void
-    +coller(cible : Perspective) : void
+    -source : PerspectiveLeaf
+    -cible : PerspectiveLeaf
+    +MediatorCopie(source : PerspectiveLeaf, cible : PerspectiveLeaf)
+    +notifier(source : Object, evenement : String, data : Object) : void
 }
 
 class GestionnaireCopie {
-    -strategie : StrategieCopie
-    +definirStrategie(s : StrategieCopie) : void
-    +executerCopie(p : Perspective) : ParametresAffichage
-    +executerColler(p : Perspective, param : ParametresAffichage) : void
+    -mediator : MediatorCopie
+    +GestionnaireCopie()
+    +copier(source : PerspectiveLeaf) : void
+    +coller(cible : PerspectiveLeaf) : void
 }
 
-class Perspective {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
-}
-
-class ParametresAffichage {
-    +zoom : double
-    +x : double
-    +y : double
+class PerspectiveLeaf {
+    -zoom : double
+    -x : double
+    -y : double
+    +getZoom() : double
+    +getX() : double
+    +getY() : double
+    +setZoom(zoom : double) : void
+    +setCentre(x : double, y : double) : void
 }
 
 ' =====================================================
 ' RELATIONS ENTRE LES CLASSES
 ' =====================================================
-MediatorCopie --> GestionnaireCopie : utilise
-MediatorCopie --> ParametresAffichage : stocke dernier
-MediatorCopie --> Perspective : agit sur
-GestionnaireCopie --> StrategieCopie
-StrategieCopie <|.. CopieEchelle
-StrategieCopie <|.. CopieTranslation
-StrategieCopie <|.. CopieComplete
-StrategieCopie <|.. CopieVide
+Mediator <|.. MediatorCopie
+GestionnaireCopie --> MediatorCopie : utilise >
+MediatorCopie --> PerspectiveLeaf : coordonne >
+
+note right of MediatorCopie
+    **Patron Mediator (GoF)**
+    - Mediator: Interface Mediator
+    - ConcreteMediator: MediatorCopie
+    - Colleagues: PerspectiveLeaf (source/cible)
+
+    **Implémentation actuelle:**
+    - Copie position (x, y) entre perspectives
+    - Coordonne sans couplage direct
+
+    **⚠️ À VENIR: Patron Strategy**
+    - StrategieCopie interface
+    - CopieEchelle (zoom seulement)
+    - CopieTranslation (position seulement)
+    - CopieComplete (zoom + position)
+    - CopieVide (rien)
+
+    **Avantages:**
+    - Découple perspectives
+    - Centralise coordination
+    - Facile à étendre
+
+    **GRASP: Low Coupling**
+    Perspectives ne se connaissent pas
+end note
 
 @enduml

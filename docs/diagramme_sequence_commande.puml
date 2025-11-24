@@ -10,52 +10,101 @@
 title X-Vision - Diagramme de séquence : Exécution d’une commande (Zoom ou Translation)
 
 actor Utilisateur as U
-participant "VuePerspective" as V
-participant "SourisControleur" as C
+participant "VuePrincipale" as V
+participant "ControleurPerspective" as C
 participant "GestionnaireCommandes (Singleton)" as G
 participant "CommandeZoom" as Z
-participant "Perspective (Modèle)" as P
+participant "PerspectiveLeaf (Sujet)" as P
+participant "Vignette (ObserverIF)" as Vignette
+participant "MinimapOverlay (ObserverIF)" as MM
 
 ' =====================================================
-' SCÉNARIO : L’utilisateur effectue un zoom via la souris
+' SCÉNARIO : L'utilisateur effectue un zoom via la molette souris
 ' =====================================================
 
-U -> V : Interaction (roue souris / geste zoom)
-V -> C : notifierActionUtilisateur("zoom")
+U -> V : Molette souris (zoom)
+activate V
+V -> V : mouseWheelMoved(event)
+V -> C : zoomerAvecFacteur(perspective, facteur)
+activate C
+
+' --- Création et exécution de la commande ---
+C -> C : creer CommandeZoom(P, facteur)
+C -> G : getInstance()
+G --> C : instance
 C -> G : executerCommande(new CommandeZoom(P, facteur))
+activate G
 G -> Z : executer()
 activate Z
 
+' --- Sauvegarde état précédent ---
+Z -> Z : ancienZoom = perspective.getZoom()
+
 ' --- Application du zoom sur la perspective ---
-Z -> P : appliquerZoom(facteur)
+Z -> P : setZoom(nouveauZoom)
 activate P
-P -> P : ajusterFacteurEchelle(facteur)
-P --> Z : mise à jour terminée
-deactivate P
+P -> P : this.zoom = nouveauZoom
+P -> P : notifier()
 
 ' --- Notification des observateurs (vues abonnées) ---
-Z -> P : notifier()
-P -> V : mettreAJour()
-V -> V : rafraichirAffichage()
-V --> P : affichage mis à jour
+loop pour chaque observateur
+    P -> V : actualiser()
+    activate V
+    V -> V : repaint()
+    deactivate V
 
-' --- Ajout à l’historique pour Undo/Redo ---
-Z -> G : enregistrerCommande(this)
-G -> G : push(commande)
+    P -> Vignette : actualiser()
+    activate Vignette
+    Vignette -> Vignette : rafraichir()
+    Vignette -> Vignette : repaint()
+    deactivate Vignette
+
+    P -> MM : actualiser()
+    activate MM
+    MM -> MM : updateMinimapView()
+    MM -> MM : repaint()
+    deactivate MM
+end
+deactivate P
+
+' --- Ajout à l'historique pour Undo/Redo ---
 deactivate Z
+G -> G : pileUndo.push(commande)
+G -> G : pileRedo.clear()
+deactivate G
 
 ' --- Fin de la commande ---
-G --> C : confirmation d’exécution
-C --> V : signal de fin
+C --> V : zoom appliqué
+deactivate C
+deactivate V
+
+note right of G
+    **Patron Command (GoF)**
+    - Command: Commande
+    - ConcreteCommand: CommandeZoom
+    - Invoker: GestionnaireCommandes
+    - Receiver: PerspectiveLeaf
+
+    **Patron Singleton (GoF)**
+    GestionnaireCommandes = instance unique
+
+    **Patron Observer (GoF)**
+    notifier() → actualiser() sur toutes vues
+
+    **GRASP: Controller**
+    ControleurPerspective centralise
+    les opérations utilisateur
+end note
 
 ' =====================================================
 ' LÉGENDE :
-'  - Utilisateur : initie la commande (événement souris ou menu)
-'  - VuePerspective : transmet l’action au contrôleur
-'  - SourisControleur : crée et envoie la commande au GestionnaireCommandes
-'  - GestionnaireCommandes : centralise l’historique et exécute la commande
-'  - CommandeZoom : encapsule l’action
-'  - Perspective : modèle modifié qui notifie ses observateurs
+'  - Utilisateur : initie le zoom (molette souris)
+'  - VuePrincipale : capte l'événement, délègue au contrôleur
+'  - ControleurPerspective : crée et envoie commande au gestionnaire
+'  - GestionnaireCommandes : Singleton, centralise historique Undo/Redo
+'  - CommandeZoom : encapsule l'action avec état précédent
+'  - PerspectiveLeaf : modèle modifié qui notifie ses observateurs
+'  - Observateurs : toutes les vues abonnées se rafraîchissent
 ' =====================================================
 
 @enduml

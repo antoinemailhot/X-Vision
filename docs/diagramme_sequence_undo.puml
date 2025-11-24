@@ -1,65 +1,160 @@
 @startuml
 ' =====================================================
-' DIAGRAMME DE SÉQUENCE - ANNULATION D’UNE COMMANDE
+' DIAGRAMME DE SÉQUENCE - ANNULATION D'UNE COMMANDE
 ' Projet : X-Vision
-' Auteur : Antoine Mailhot & Micaël Racine-Leblanc 
-' Description : Représente le processus d’annulation (Undo)
-'               d’une commande exécutée (ex : Zoom)
+' Auteur : Antoine Mailhot & Micaël Racine-Leblanc
+' Description : Représente le processus d'annulation (Undo)
+'               d'une commande exécutée (ex : Zoom)
 ' =====================================================
 
-title X-Vision - Diagramme de séquence : Annulation d’une commande (Undo)
+title X-Vision - Diagramme de séquence : Annulation d'une commande (Undo)
 
 actor Utilisateur as U
 participant "VuePrincipale" as V
-participant "MenuControleur" as C
-participant "GestionnaireCommandes (Singleton)" as G
+participant "ControleurPerspective" as C
+participant "GestionnaireCommandes\n(Singleton)" as G
 participant "CommandeZoom" as Z
-participant "Memento" as M
-participant "Perspective (Modèle)" as P
+participant "PerspectiveLeaf\n(Sujet)" as P
+participant "Vignette\n(ObserverIF)" as Vignette
+participant "MinimapOverlay\n(ObserverIF)" as MM
 
 ' =====================================================
-' SCÉNARIO : L’utilisateur demande un Undo
+' SCÉNARIO : L'utilisateur clique sur bouton "Undo"
 ' =====================================================
 
-U -> V : cliquer sur "Annuler (Undo)"
-V -> C : notifierActionUtilisateur("undo")
-C -> G : annulerDerniereCommande()
+U -> V : Clic sur bouton "Undo"
+activate V
+V -> V : actionPerformed(event)
+V -> G : getInstance()
+G --> V : instance
 
-' --- Vérification historique ---
+V -> G : undo()
 activate G
-G -> G : commande = historique.pop()
-alt commande existe
+
+' --- Vérification pile Undo ---
+alt pileUndo non vide
+    G -> G : commande = pileUndo.pop()
+    G -> G : pileRedo.push(commande)
+
     G -> Z : annuler()
     activate Z
 
-    ' --- Restauration via Memento ---
-    Z -> M : obtenirEtatPrecedent()
-    activate M
-    M -> P : restaurerEtat(etatSauvegarde)
+    ' --- Restauration état précédent ---
+    note right of Z
+        La commande a sauvegardé
+        l'état précédent lors de executer()
+        (ancienZoom, ancienneX, ancienneY)
+    end note
+
+    Z -> Z : Récupérer ancienZoom stocké
+    Z -> P : setZoom(ancienZoom)
     activate P
-    P -> P : appliquerParametresSauvegardes()
-    P --> M : restauration terminée
+
+    P -> P : this.zoom = ancienZoom
+    P -> P : notifier()
+
+    ' --- Notification des observateurs ---
+    loop pour chaque observateur
+        P -> V : actualiser()
+        activate V
+        V -> V : repaint()
+        deactivate V
+
+        P -> Vignette : actualiser()
+        activate Vignette
+        Vignette -> Vignette : rafraichir()
+        Vignette -> Vignette : repaint()
+        deactivate Vignette
+
+        P -> MM : actualiser()
+        activate MM
+        MM -> MM : updateMinimapView()
+        MM -> MM : repaint()
+        deactivate MM
+    end
+
     deactivate P
-    deactivate M
-
-    ' --- Notification des vues abonnées ---
-    Z -> P : notifier()
-    P -> V : mettreAJour()
-    V -> V : rafraichirAffichage()
-    V --> P : affichage restauré
-
     deactivate Z
-else
-    G -> V : afficherMessage("Aucune commande à annuler.")
+
+    G --> V : Undo réussi
+
+else pileUndo vide
+    G --> V : Aucune commande à annuler
+    V -> V : Afficher message "Rien à annuler"
 end
+
 deactivate G
+deactivate V
+
+note right of G
+    **Patron Command (GoF)**
+    - Chaque commande sauvegarde
+      son etat precedent
+    - annuler() restaure cet etat
+    - Pas besoin de Memento!
+
+    **Patron Singleton (GoF)**
+    GestionnaireCommandes = instance unique
+
+    **Deux piles:**
+    - pileUndo: commandes executees
+    - pileRedo: commandes annulees
+
+    **GRASP: Controller**
+    Centralise la gestion Undo/Redo
+
+    ----
+
+    **IMPORTANT: 2 SYSTEMES PARALLELES**
+
+    (1) **Undo/Redo via Command:**
+    - GestionnaireCommandes (ce diagramme)
+    - Pour actions utilisateur ponctuelles
+    - CommandeZoom stocke ancienZoom
+
+    (2) **Undo/Redo via Memento:**
+    - GestionnaireMemento (autre systeme)
+    - Pour persistance/restauration complete
+    - PerspectiveMemento stocke TOUT l'etat
+
+    Ces 2 systemes sont INDEPENDANTS!
+end note
 
 ' =====================================================
-' LÉGENDE :
-'  - GestionnaireCommandes : centralise les historiques de commandes
-'  - CommandeZoom : contient le lien vers un Memento (état précédent)
-'  - Memento : capture et restaure l’état d’un objet (ici Perspective)
-'  - Perspective : modèle dont l’état est restauré
+' LEGENDE
 ' =====================================================
+note left of U
+    **LEGENDE:**
+    - Utilisateur: Initie le Undo (bouton UI)
+    - VuePrincipale: Capte evenement, appelle gestionnaire
+    - GestionnaireCommandes: Singleton, gere piles Undo/Redo
+    - CommandeZoom: Stocke etat precedent, peut s'annuler
+    - PerspectiveLeaf: Modele modifie qui notifie observateurs
+    - Observateurs: Toutes vues se rafraichissent automatiquement
+
+    **DIFFERENCE AVEC MEMENTO:**
+    Command stocke SEULEMENT ce qui change (zoom)
+    Memento stocke TOUT l'etat (zoom, x, y, image, crops, annotations)
+
+    ----
+
+    **EXEMPLE CONCRET:**
+
+    **Etat initial:** zoom = 1.0
+
+    **Action 1:** Utilisateur zoome a 2.0
+    - CommandeZoom creee avec ancienZoom = 1.0, nouveauZoom = 2.0
+    - executer() : setZoom(2.0)
+    - Commande empilee dans pileUndo
+
+    **Action 2:** Utilisateur clique "Undo"
+    - CommandeZoom depilee, annuler() : setZoom(1.0)
+    - Commande empilee dans pileRedo
+    - Resultat: zoom revient a 1.0
+
+    **Action 3:** Utilisateur clique "Redo"
+    - CommandeZoom depilee de pileRedo, executer() : setZoom(2.0)
+    - Resultat: zoom revient a 2.0
+end note
 
 @enduml

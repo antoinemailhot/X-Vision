@@ -9,47 +9,66 @@
 
 title X-Vision - Diagramme de séquence : Patron Observateur (Image / Perspective / Vues)
 
-participant "Perspective (Sujet)" as P
-participant "Image (Sujet)" as I
-participant "VuePrincipale (Observateur)" as V
-participant "VuePerspective (Observateur)" as VP
-participant "VueMiniature (Observateur)" as VM
+participant "PerspectiveLeaf (Sujet)" as P
+participant "GestionnaireAnnotations (Sujet)" as GA
+participant "VuePrincipale (ObserverIF)" as VP
+participant "Vignette (ObserverIF)" as VT
+participant "VueMini (ObserverIF)" as VM
+participant "MinimapOverlay (ObserverIF)" as MM
+participant "VueAnnotations (ObserverIF)" as VA
 
 ' =====================================================
 ' SCÉNARIO : Mise à jour de la perspective après un zoom
 ' =====================================================
 
 activate P
-P -> I : modifierParamètresZoom(nouveauNiveau)
-activate I
-I -> I : mettreÀJourDonnées()
-deactivate I
+P -> P : setZoom(nouveauZoom)
+P -> P : notifier()
 
 ' --- Notification des observateurs inscrits ---
-P -> P : notifierObservateurs()
 loop pour chaque observateur inscrit
-    P -> V : mettreAJour(P)
-    activate V
-    V -> V : rafraîchirAffichage()
-    deactivate V
-
-    P -> VP : mettreAJour(P)
+    P -> VP : actualiser()
     activate VP
-    VP -> VP : redessinerPerspective()
+    VP -> VP : rafraichirAffichage()
+    VP -> VP : repaint()
     deactivate VP
 
-    P -> VM : mettreAJour(P)
+    P -> VT : actualiser()
+    activate VT
+    VT -> VT : rafraichir()
+    VT -> VT : repaint()
+    deactivate VT
+
+    P -> VM : actualiser()
     activate VM
-    VM -> VM : redessinerMiniature()
+    VM -> VM : rafraichir()
+    VM -> VM : repaint()
     deactivate VM
+
+    P -> MM : actualiser()
+    activate MM
+    MM -> MM : updateMinimapView()
+    MM -> MM : repaint()
+    deactivate MM
 end
 deactivate P
 
+note right of P
+    **Patron Observer (GoF)**
+    - Sujet: PerspectiveLeaf, GestionnaireAnnotations
+    - ObserverIF: Interface avec actualiser()
+    - Observers concrets: VuePrincipale, Vignette,
+      VueMini, MinimapOverlay, VueAnnotations
+
+    **GRASP: Low Coupling**
+    Le modèle ne connaît pas les vues concrètes
+end note
+
 ' =====================================================
 ' LÉGENDE :
-'  - Perspective/Image = Sujet(s) observé(s)
-'  - VuePrincipale, VuePerspective, VueMiniature = Observateurs
-'  - Notifie() appelle mettreAJour() sur chaque vue inscrite
+'  - PerspectiveLeaf/GestionnaireAnnotations = Sujets observés
+'  - VuePrincipale, Vignette, VueMini, etc. = Observateurs
+'  - notifier() appelle actualiser() sur chaque vue inscrite
 ' =====================================================
 
 @enduml

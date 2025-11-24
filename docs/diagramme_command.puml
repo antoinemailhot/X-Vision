@@ -15,39 +15,67 @@ interface Commande {
 }
 
 class CommandeZoom implements Commande {
-    -niveauPrecedent : double
-    -niveauNouveau : double
-    -perspective : Perspective
-    +CommandeZoom(perspective : Perspective, niveauNouveau : double)
+    -perspective : PerspectiveLeaf
+    -ancienZoom : double
+    -nouveauZoom : double
+    +CommandeZoom(perspective : PerspectiveLeaf, nouveauZoom : double)
     +executer() : void
     +annuler() : void
 }
 
 class CommandeTranslation implements Commande {
-    -deplacementX : double
-    -deplacementY : double
-    -positionPrecedenteX : double
-    -positionPrecedenteY : double
-    -perspective : Perspective
-    +CommandeTranslation(perspective : Perspective, dx : double, dy : double)
+    -perspective : PerspectiveLeaf
+    -ancienneX : double
+    -ancienneY : double
+    -nouvelleX : double
+    -nouvelleY : double
+    +CommandeTranslation(perspective : PerspectiveLeaf, dx : double, dy : double)
     +executer() : void
     +annuler() : void
 }
 
-class GestionnaireCommandes {
-    -historique : Stack<Commande>
-    -annulees : Stack<Commande>
-    +executerCommande(cmd : Commande) : void
-    +annulerDerniere() : void
-    +refaireDerniere() : void
+class CommandeAjouterAnnotation implements Commande {
+    -gestionnaireAnnotations : GestionnaireAnnotations
+    -annotation : Annotation
+    +CommandeAjouterAnnotation(gestionnaire : GestionnaireAnnotations, annot : Annotation)
+    +executer() : void
+    +annuler() : void
 }
 
-class Perspective {
-    -niveauZoom : double
-    -positionX : double
-    -positionY : double
-    +modifierZoom(nouveau : double) : void
-    +modifierPosition(dx : double, dy : double) : void
+class CommandeDefinirCrop implements Commande {
+    -perspective : PerspectiveLeaf
+    -ancienCrop : Crop
+    -nouveauCrop : Crop
+    +CommandeDefinirCrop(perspective : PerspectiveLeaf, crop : Crop)
+    +executer() : void
+    +annuler() : void
+}
+
+class GestionnaireCommandes <<Singleton>> {
+    -{static} instance : GestionnaireCommandes
+    -pileUndo : Stack<Commande>
+    -pileRedo : Stack<Commande>
+    -GestionnaireCommandes()
+    +{static} getInstance() : GestionnaireCommandes
+    +executerCommande(cmd : Commande) : void
+    +undo() : void
+    +redo() : void
+}
+
+class PerspectiveLeaf {
+    -zoom : double
+    -x : double
+    -y : double
+    -crop : Crop
+    +setZoom(zoom : double) : void
+    +setCentre(x : double, y : double) : void
+    +setCrop(crop : Crop) : void
+}
+
+class GestionnaireAnnotations {
+    -annotations : List<Annotation>
+    +ajouter(a : Annotation) : void
+    +supprimer(a : Annotation) : void
 }
 
 ' =====================================================
@@ -55,9 +83,25 @@ class Perspective {
 ' =====================================================
 Commande <|.. CommandeZoom
 Commande <|.. CommandeTranslation
-GestionnaireCommandes --> Commande : utilise
-CommandeZoom --> Perspective : agit sur
-CommandeTranslation --> Perspective : agit sur
-Perspective "1" o-- "plusieurs" Commande : opérations
+Commande <|.. CommandeAjouterAnnotation
+Commande <|.. CommandeDefinirCrop
+GestionnaireCommandes o-- Commande : gère >
+CommandeZoom --> PerspectiveLeaf : modifie >
+CommandeTranslation --> PerspectiveLeaf : modifie >
+CommandeAjouterAnnotation --> GestionnaireAnnotations : modifie >
+CommandeDefinirCrop --> PerspectiveLeaf : modifie >
+
+note right of GestionnaireCommandes
+    **Patron Singleton (GoF)**
+    - Constructeur privé
+    - getInstance() statique
+    - Instance unique partagée
+
+    **Patron Command (GoF)**
+    - Invoker qui gère Undo/Redo
+    - Maintient 2 piles (Undo/Redo)
+
+    **GRASP: Controller**
+end note
 
 @enduml
