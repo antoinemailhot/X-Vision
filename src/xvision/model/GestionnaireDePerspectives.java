@@ -7,7 +7,14 @@ import java.awt.Rectangle;
 import java.util.*;
 
 /**
- * Gestionnaire des perspectives : création, stockage, sauvegarde et chargement
+ * Gestionnaire responsable de la persistance des perspectives.
+ * Gère la sauvegarde et le chargement au format JSON personnalisé.
+ * 
+ * <p>
+ * Cette classe contient un parseur JSON manuel (récursif) pour éviter
+ * l'utilisation de bibliothèques externes lourdes (Jackson/Gson).
+ * Elle gère aussi la reconstruction de l'arbre Composite et des piles Undo/Redo.
+ * </p>
  */
 public class GestionnaireDePerspectives {
 
@@ -43,99 +50,215 @@ public class GestionnaireDePerspectives {
     }
 
     /**
-     * Sauvegarde une perspective dans un fichier JSON complet.
+     * Sauvegarde une perspective (ou un composite) dans un fichier JSON complet.
      */
     public void sauvegarderPerspective(String id, String dossier) {
         PerspectiveComponent p = perspectives.get(id);
-        if (!(p instanceof PerspectiveLeaf)) return;
+        if (p == null) return;
+        sauvegarderPerspective(p, Path.of(dossier, id + ".json").toString());
+    }
 
-        PerspectiveLeaf leaf = (PerspectiveLeaf) p;
-
+    /**
+     * Sauvegarde une perspective directement dans un fichier spécifique.
+     */
+    public void sauvegarderPerspective(PerspectiveComponent p, String cheminFichier) {
+        if (p == null) return;
         try {
-            Files.createDirectories(Path.of(dossier));
-            String json = leaf.exporterEnJSON();
-            Path fichier = Path.of(dossier, id + ".json");
-            Files.writeString(fichier, json);
-            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " sauvegardée.");
+            Path path = Path.of(cheminFichier);
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            String json = p.exporterEnJSON();
+            Files.writeString(path, json);
+            System.out.println("[GestionnaireDePerspectives] Perspective sauvegardée vers " + cheminFichier);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     /**
-     * Charge une perspective depuis un fichier JSON et restaure mementos, image et crop.
+     * Charge une perspective (Leaf ou Composite) depuis un fichier JSON.
      */
     public void chargerPerspective(String cheminFichier) {
         try {
             String json = Files.readString(Path.of(cheminFichier));
+            PerspectiveComponent p = parserJSON(json);
+            if (p != null) {
+                // On utilise le nom du fichier comme ID pour simplifier
+                String nomFichier = Path.of(cheminFichier).getFileName().toString().replace(".json", "");
+                perspectives.put(nomFichier, p);
+                System.out.println("[GestionnaireDePerspectives] Perspective " + nomFichier + " chargée.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-            String id = extraireValeurJSON(json, "idPerspective");
-            double zoom = Double.parseDouble(extraireValeurJSON(json, "zoom"));
-            double x = Double.parseDouble(extraireValeurJSON(json, "x"));
-            double y = Double.parseDouble(extraireValeurJSON(json, "y"));
+    /**
+     * Parseur récursif pour reconstruire l'arbre Composite/Leaf depuis le JSON.
+     * C'est le cœur du moteur de chargement.
+     * 
+     * @param json La chaîne JSON brute.
+     * @return Un composant (Leaf ou Composite) reconstruit.
+     */
+    private PerspectiveComponent parserJSON(String json) {
+        json = json.trim();
+        String type = extraireValeurJSON(json, "type");
+
+        if ("composite".equals(type)) {
+            PerspectiveComposite composite = new PerspectiveComposite();
+            List<String> enfantsJson = decouperTableauObjets(json, "enfants");
+            for (String enfantStr : enfantsJson) {
+                PerspectiveComponent enfant = parserJSON(enfantStr);
+                if (enfant != null) composite.ajouter(enfant);
+            }
+            return composite;
+
+        } else if ("leaf".equals(type) || type == null) { 
+            // Cas d'une feuille (PerspectiveLeaf)
+            String idStr = extraireValeurJSON(json, "idPerspective");
+            // Si pas d'ID, on ne peut pas faire grand chose, mais on continue si possible
+            
+            // Extraction des primitives
+            String zoomStr = extraireValeurJSON(json, "zoom");
+            String xStr = extraireValeurJSON(json, "x");
+            String yStr = extraireValeurJSON(json, "y");
+            
+            double zoom = (zoomStr != null) ? Double.parseDouble(zoomStr) : 1.0;
+            double x = (xStr != null) ? Double.parseDouble(xStr) : 0.0;
+            double y = (yStr != null) ? Double.parseDouble(yStr) : 0.0;
+            
             String base64Image = extraireValeurJSON(json, "imageBase64");
 
             PerspectiveLeaf leaf = new PerspectiveLeaf(zoom, x, y);
 
-            // Restaurer l'image
+            // Restauration de l'image depuis le Base64
             if (base64Image != null && !base64Image.isEmpty()) {
-                leaf.restaurerImageDepuisBase64(base64Image, "restored_" + id + ".png");
+                // On utilise un chemin absolu pour garantir l'écriture correcte
+                String cheminAbsolu = Path.of("restored_" + (idStr != null ? idStr : "temp") + ".png").toAbsolutePath().toString();
+                leaf.restaurerImageDepuisBase64(base64Image, cheminAbsolu);
             }
 
-            // Restaurer le crop
+            // Restauration du Crop
             String cropStr = extraireValeurJSON(json, "crop");
             if (cropStr != null && !cropStr.equals("null")) {
                 double cx = Double.parseDouble(extraireValeurJSON(cropStr, "x"));
                 double cy = Double.parseDouble(extraireValeurJSON(cropStr, "y"));
                 double cw = Double.parseDouble(extraireValeurJSON(cropStr, "width"));
                 double ch = Double.parseDouble(extraireValeurJSON(cropStr, "height"));
-                leaf.setCrop(new Rectangle((int)cx, (int)cy, (int)cw, (int)ch));
+                leaf.setCropSansSauvegarde(new Rectangle((int)cx, (int)cy, (int)cw, (int)ch));
             } else {
-                leaf.setCrop(null);
+                leaf.setCropSansSauvegarde(null);
             }
 
-            // Restaurer les mementos
-            if (json.contains("\"mementos\"")) {
-                String mementosStr = json.substring(json.indexOf("\"mementos\"") + 10, json.lastIndexOf("]"));
-                String[] mementoItems = mementosStr.split("\\},");
-                for (String item : mementoItems) {
-                    item = item.replace("{", "").replace("}", "").trim();
-                    if (item.isEmpty()) continue;
-                    double mz = 1.0, mx = 0.0, my = 0.0;
-                    String[] champs = item.split(",");
-                    for (String champ : champs) {
-                        champ = champ.trim();
-                        if (champ.startsWith("\"zoom\"")) mz = Double.parseDouble(champ.split(":")[1].trim());
-                        else if (champ.startsWith("\"centreX\"")) mx = Double.parseDouble(champ.split(":")[1].trim());
-                        else if (champ.startsWith("\"centreY\"")) my = Double.parseDouble(champ.split(":")[1].trim());
-                    }
-                    leaf.ajouterMemento(new PerspectiveMemento(
-                        leaf.getIdPerspective(),
-                        mz,
-                        mx,
-                        my,
-                        "",           // imageBase64 vide
-                        List.of(),    // crops vides
-                        List.of(),    // annotations vides
-                        "{}"          // JSON vide
-                    ));
-                }
-            }
+            // Restauration de l'historique complet (Deep State)
+            int id = (idStr != null) ? Integer.parseInt(idStr) : leaf.getIdPerspective();
+            Stack<PerspectiveMemento> undoStack = parserPileMementos(json, "undoStack", id, base64Image);
+            Stack<PerspectiveMemento> redoStack = parserPileMementos(json, "redoStack", id, base64Image);
+            
+            leaf.getMementoManager().restaurerHistorique(undoStack, redoStack);
 
-            perspectives.put(id, leaf);
-            System.out.println("[GestionnaireDePerspectives] Perspective " + id + " chargée.");
-        } catch (IOException e) {
-            e.printStackTrace();
+            return leaf;
         }
+        return null;
+    }
+
+    private Stack<PerspectiveMemento> parserPileMementos(String json, String keyStack, int idPerspective, String referenceImage) {
+        Stack<PerspectiveMemento> stack = new Stack<>();
+        List<String> mementosJson = decouperTableauObjets(json, keyStack);
+        for (String mStr : mementosJson) {
+            stack.push(PerspectiveMemento.fromJSON(mStr, idPerspective, referenceImage));
+        }
+        return stack;
     }
 
     /**
-     * Méthode simple pour extraire une valeur JSON d'une clé.
-     * Supporte les objets JSON imbriqués (ex: crop)
+     * Découpe un tableau JSON d'objets [...] en une liste de chaînes JSON individuelles { ... }
+     * Gère l'imbrication des accolades.
+     */
+    private List<String> decouperTableauObjets(String json, String key) {
+        List<String> result = new ArrayList<>();
+        int indexKey = json.indexOf("\"" + key + "\"");
+        if (indexKey == -1) return result;
+
+        int indexStartArray = json.indexOf("[", indexKey);
+        if (indexStartArray == -1) return result;
+
+        int accoladeCount = 0;
+        int startObj = -1;
+        boolean inString = false;
+
+        // On parcourt à partir du crochet ouvrant
+        for (int i = indexStartArray + 1; i < json.length(); i++) {
+            char c = json.charAt(i);
+            
+            if (c == '"' && json.charAt(i-1) != '\\') {
+                inString = !inString;
+            }
+            if (inString) continue;
+
+            if (c == '{') {
+                if (accoladeCount == 0) startObj = i;
+                accoladeCount++;
+            } else if (c == '}') {
+                accoladeCount--;
+                if (accoladeCount == 0 && startObj != -1) {
+                    result.add(json.substring(startObj, i + 1));
+                    startObj = -1;
+                }
+            } else if (c == ']' && accoladeCount == 0) {
+                break; // Fin du tableau
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Méthode robuste pour extraire une valeur JSON d'une clé.
      */
     private String extraireValeurJSON(String json, String key) {
-        String pattern = "\"" + key + "\":\\s*(\\{.*?\\}|\"[^\"]*\"|[^,\\}]+)";
-        return json.replaceAll("(?s).*" + pattern + ".*", "$1").replaceAll("^\"|\"$", "");
+        String pattern = "\"" + key + "\":";
+        int start = json.indexOf(pattern);
+        if (start == -1) return null;
+        start += pattern.length();
+        
+        // Sauter les espaces
+        while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
+            start++;
+        }
+        
+        if (start >= json.length()) return null;
+        
+        char firstChar = json.charAt(start);
+        if (firstChar == '"') {
+            // C'est une chaîne
+            int end = json.indexOf("\"", start + 1);
+            // Gérer les quotes échappées
+            while (end != -1 && json.charAt(end - 1) == '\\') {
+                end = json.indexOf("\"", end + 1);
+            }
+            if (end == -1) return null;
+            return json.substring(start + 1, end);
+        } else if (firstChar == '{') {
+            // C'est un objet
+            int braceCount = 0;
+            for (int i = start; i < json.length(); i++) {
+                char c = json.charAt(i);
+                if (c == '{') braceCount++;
+                else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0) return json.substring(start, i + 1);
+                }
+            }
+            return null;
+        } else {
+            // C'est un nombre, booléen ou null
+            int end = start;
+            while (end < json.length() && json.charAt(end) != ',' && json.charAt(end) != '}' && json.charAt(end) != ']') {
+                end++;
+            }
+            return json.substring(start, end).trim();
+        }
     }
 
     /**

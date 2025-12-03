@@ -2,6 +2,7 @@ package xvision.controller;
 
 import java.awt.Rectangle;
 import xvision.model.GestionnaireCrop;
+import xvision.model.PerspectiveLeaf;
 
 /**
  * Commande pour définir une zone de crop
@@ -14,16 +15,19 @@ import xvision.model.GestionnaireCrop;
 public class CommandeDefinirCrop implements Commande {
 
     private GestionnaireCrop gestionnaire;
+    private PerspectiveLeaf perspective;
     private Rectangle nouveauCrop;
     private Rectangle ancienCrop;
 
     /**
      * Constructeur
-     * @param gestionnaire Le gestionnaire de crop
+     * @param gestionnaire Le gestionnaire de crop (pour l'affichage)
+     * @param perspective La perspective à modifier (pour la persistance)
      * @param crop Le nouveau rectangle de crop
      */
-    public CommandeDefinirCrop(GestionnaireCrop gestionnaire, Rectangle crop) {
+    public CommandeDefinirCrop(GestionnaireCrop gestionnaire, PerspectiveLeaf perspective, Rectangle crop) {
         this.gestionnaire = gestionnaire;
+        this.perspective = perspective;
         this.nouveauCrop = crop;
         this.ancienCrop = gestionnaire.getZoneCrop();
     }
@@ -34,6 +38,9 @@ public class CommandeDefinirCrop implements Commande {
     @Override
     public void executer() {
         gestionnaire.definirCrop(nouveauCrop);
+        if (perspective != null) {
+            perspective.setCrop(nouveauCrop);
+        }
         System.out.println("[CommandeDefinirCrop] Crop défini");
     }
 
@@ -43,6 +50,9 @@ public class CommandeDefinirCrop implements Commande {
     @Override
     public void annuler() {
         gestionnaire.definirCrop(ancienCrop);
+        if (perspective != null) {
+            perspective.setCrop(ancienCrop);
+        }
         System.out.println("[CommandeDefinirCrop] Crop annulé (undo)");
     }
 }

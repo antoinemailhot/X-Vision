@@ -10,24 +10,47 @@ import java.util.stream.Collectors;
 
 /**
  * Perspective individuelle (feuille) dans l'arbre Composite.
- * Gère son état interne et son propre historique Memento.
+ * Gère son état interne (zoom, position, image, crop) et son propre historique Memento.
+ * 
+ * <p>
+ * Cette classe est le cœur du modèle. Elle implémente plusieurs patrons :
+ * <ul>
+ *   <li><b>Composite (Leaf)</b> : C'est un élément terminal de l'arbre de perspectives.</li>
+ *   <li><b>Memento</b> : Elle crée et restaure des instantanés de son état pour le Undo/Redo.</li>
+ *   <li><b>Observer</b> : Elle notifie les vues (MainGUI, VueAnnotations) lors de changements.</li>
+ * </ul>
+ * </p>
  *
- * Principes respectés :
- * - GRASP (Information Expert) : la feuille connaît son état.
- * - Memento : chaque modification crée un snapshot restaurable.
- * - Observer : notifie les vues lors de tout changement.
+ * @author Antoine Mailhot & Micaël Racine-Leblanc
+ * @version 4.0 (Support Deep State & Base64 Caching)
  */
 public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
 
     private final int idPerspective;
+    // Gestionnaire d'historique dédié à cette perspective (Undo/Redo local)
     private final GestionnaireMemento gestionnaireMemento = new GestionnaireMemento();
 
+    // État de la perspective
     private double zoom;
     private double x;
     private double y;
     private String cheminImage;
-    private Crop crop; // crop actuel
+    private Crop crop; // Zone de rognage actuelle (null si image complète)
+    
+    // --- Optimisation Mémoire ---
+    // Cache pour l'image Base64 afin d'éviter de recharger le fichier disque 
+    // et de réencoder l'image à chaque création de Memento (ce qui serait très lent).
+    private String cachedBase64 = null;
+    private String cachedCheminImage = null;
 
+    /**
+     * Constructeur principal.
+     * Initialise une perspective et sauvegarde immédiatement son état initial.
+     * 
+     * @param zoom Niveau de zoom initial (1.0 = 100%)
+     * @param x Position X du centre
+     * @param y Position Y du centre
+     */
     public PerspectiveLeaf(double zoom, double x, double y) {
         super();
         this.idPerspective = Identifiant.generer();
@@ -35,45 +58,51 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         this.x = x;
         this.y = y;
         this.crop = null;
+        
+        // Sauvegarde de l'état initial dans l'historique.
+        // Cela permet de faire "Undo" pour revenir à l'état de création.
         gestionnaireMemento.sauvegarder(creerMemento());
     }
 
     public int getIdPerspective() { return idPerspective; }
 
     /**
-     * Création d'un Memento avec l'état complet
+     * Crée un Memento (instantané) de l'état actuel.
+     * Utilise le cache Base64 pour optimiser la performance.
+     * 
+     * @return Un objet PerspectiveMemento immuable contenant tout l'état.
      */
     public PerspectiveMemento creerMemento() {
-        String etatJSON = exporterEnJSON();
         List<Crop> crops = (crop != null) ? List.of(crop) : List.of();
+        // Récupère l'image encodée (depuis le cache si possible)
+        String base64 = imageEnBase64();
         return new PerspectiveMemento(
             idPerspective,
-            zoom,
-            x,
-            y,
-            etatJSON,
-            crops,           // crops
-            List.of(),       // annotations
-            etatJSON
+            zoom, x, y, base64, crops, null 
         );
     }
 
     /**
-     * Exporte l'état courant en JSON, avec l'image encodée en Base64
+     * Exporte l'état courant et TOUT l'historique en JSON.
+     * C'est ici que la magie du "Deep State" opère : on sauvegarde non seulement
+     * l'état actuel, mais aussi toutes les piles Undo/Redo.
+     * 
+     * @return Une chaîne JSON complète.
      */
     public String exporterEnJSON() {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
+        sb.append("\"type\":\"leaf\",");
         sb.append("\"idPerspective\":").append(idPerspective).append(",");
         sb.append("\"zoom\":").append(zoom).append(",");
         sb.append("\"x\":").append(x).append(",");
         sb.append("\"y\":").append(y).append(",");
 
-        // Image encodée en Base64
-        String base64 = (cheminImage != null && !cheminImage.isEmpty()) ? encoderImageBase64(cheminImage) : "";
+        // Image encodée en Base64 (lourde, mais nécessaire pour la portabilité)
+        String base64 = imageEnBase64();
         sb.append("\"imageBase64\":\"").append(base64).append("\",");
 
-        // Crop
+        // Sérialisation du Crop actuel
         if (crop != null && crop.getZone() != null) {
             Rectangle r = crop.getZone();
             sb.append("\"crop\":{");
@@ -85,6 +114,26 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         } else {
             sb.append("\"crop\":null");
         }
+
+        // --- Sauvegarde de l'historique (Deep History) ---
+        // On passe 'base64' aux mementos pour qu'ils puissent écrire "SAME"
+        // au lieu de dupliquer l'image si elle n'a pas changé.
+        
+        sb.append(",\"undoStack\":[");
+        List<PerspectiveMemento> undoList = gestionnaireMemento.getPileUndoSnapshot();
+        for (int i = 0; i < undoList.size(); i++) {
+            sb.append(undoList.get(i).exporterEnJSON(base64));
+            if (i < undoList.size() - 1) sb.append(",");
+        }
+        sb.append("]");
+
+        sb.append(",\"redoStack\":[");
+        List<PerspectiveMemento> redoList = gestionnaireMemento.getPileRedoSnapshot();
+        for (int i = 0; i < redoList.size(); i++) {
+            sb.append(redoList.get(i).exporterEnJSON(base64));
+            if (i < redoList.size() - 1) sb.append(",");
+        }
+        sb.append("]");
 
         sb.append("}");
         return sb.toString();
@@ -174,12 +223,12 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
 
     // ================== Undo / Redo ==================
     public void undo() {
-        PerspectiveMemento m = gestionnaireMemento.undo();
+        PerspectiveMemento m = gestionnaireMemento.undo(creerMemento());
         if (m != null) restaurerDepuisMemento(m);
     }
 
     public void redo() {
-        PerspectiveMemento m = gestionnaireMemento.redo();
+        PerspectiveMemento m = gestionnaireMemento.redo(creerMemento());
         if (m != null) restaurerDepuisMemento(m);
     }
 
@@ -222,6 +271,18 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
         notifier();
     }
 
+    /**
+     * Définit le crop sans créer de memento (utilisé lors du chargement)
+     */
+    public void setCropSansSauvegarde(Rectangle rect) {
+        if (rect != null) {
+            this.crop = new Crop(rect);
+        } else {
+            this.crop = null;
+        }
+        notifier();
+    }
+
     // ================== Méthodes Composite ==================
     @Override
     public void afficher() {
@@ -256,7 +317,15 @@ public class PerspectiveLeaf extends Sujet implements PerspectiveComponent {
      */
     public String imageEnBase64() {
         if (cheminImage == null || cheminImage.isEmpty()) return "";
-        return encoderImageBase64(cheminImage);
+        
+        // Utilisation du cache si le chemin n'a pas changé
+        if (cachedBase64 != null && cheminImage.equals(cachedCheminImage)) {
+            return cachedBase64;
+        }
+        
+        cachedBase64 = encoderImageBase64(cheminImage);
+        cachedCheminImage = cheminImage;
+        return cachedBase64;
     }
 
 }

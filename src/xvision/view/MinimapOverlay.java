@@ -12,44 +12,51 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Minimap en overlay style Google Maps
- * S'affiche en bas à droite de la vue principale avec un rectangle viewport
- *
- * Patrons appliqués:
- * - Observer (GoF): Se met à jour automatiquement quand la perspective change
- * - GRASP Information Expert: Calcule le viewport car connaît image + perspective
- * - GRASP High Cohesion: Responsabilité unique = minimap de navigation
- *
- * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 1.0
+ * Composant graphique affichant une vue globale (Minimap) en surimpression.
+ * <p>
+ * Ce panneau semi-transparent se place généralement dans un coin de la vue principale.
+ * Il affiche l'image complète en miniature et un rectangle rouge (viewport) représentant
+ * la zone actuellement visible dans la fenêtre principale.
+ * </p>
+ * <h3>Fonctionnalités :</h3>
+ * <ul>
+ *   <li><b>Visualisation</b> : Affiche l'image entière redimensionnée pour tenir dans la zone de la minimap.</li>
+ *   <li><b>Navigation</b> : Permet de cliquer ou glisser sur la minimap pour déplacer rapidement la vue principale (téléportation).</li>
+ *   <li><b>Synchronisation</b> : Observe le modèle ({@link PerspectiveLeaf}) pour mettre à jour le viewport en temps réel.</li>
+ * </ul>
+ * <h3>Patrons de conception :</h3>
+ * <ul>
+ *   <li><b>Observer (GoF)</b> : S'abonne aux changements de la perspective pour redessiner le viewport.</li>
+ *   <li><b>Information Expert (GRASP)</b> : Calcule les ratios de conversion entre l'espace monde et l'espace minimap.</li>
+ * </ul>
  */
 public class MinimapOverlay extends JPanel implements ObserverIF {
 
     private PerspectiveLeaf perspective;
     private ControleurPerspective controleur;
     private BufferedImage imageComplete;
-    private String cheminImageCache; // Cache du chemin pour éviter rechargements
+    private String cheminImageCache; // Cache du chemin pour éviter rechargements inutiles
 
-    // Dimensions de la minimap
+    // Dimensions fixes de la minimap
     private static final int MINIMAP_WIDTH = 200;
     private static final int MINIMAP_HEIGHT = 150;
+    
     // Style visuel
-    private static final Color BG_COLOR = new Color(0, 0, 0, 150); // Fond semi-transparent
-    private static final Color VIEWPORT_COLOR = new Color(255, 0, 0, 200); // Rectangle rouge
-    private static final Color BORDER_COLOR = new Color(255, 255, 255, 100);
+    private static final Color BG_COLOR = new Color(0, 0, 0, 150); // Fond noir semi-transparent
+    private static final Color VIEWPORT_COLOR = new Color(255, 0, 0, 200); // Rectangle rouge vif
+    private static final Color BORDER_COLOR = new Color(255, 255, 255, 100); // Bordure blanche subtile
 
-    // Dimensions de l'image dans la minimap
+    // Dimensions calculées de l'image à l'intérieur de la minimap (pour respecter le ratio)
     private int imageX, imageY, imageWidth, imageHeight;
 
-    // Référence à la vue parente pour connaître sa taille
+    // Référence à la vue parente pour connaître la taille de la fenêtre d'affichage
     private JPanel viewportParent;
 
     /**
-     * Constructeur
-     *
-     * @param perspective La perspective à observer
-     * @param controleur Le contrôleur pour les interactions
-     * @param viewportParent Le panel parent (pour calculer la taille du viewport)
+     * Constructeur de la minimap.
+     * @param perspective La perspective à observer.
+     * @param controleur Le contrôleur pour effectuer les déplacements via la minimap.
+     * @param viewportParent Le panneau parent dont on affiche la zone visible.
      */
     public MinimapOverlay(PerspectiveLeaf perspective, ControleurPerspective controleur, JPanel viewportParent) {
         this.perspective = perspective;

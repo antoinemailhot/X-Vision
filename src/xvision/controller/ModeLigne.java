@@ -5,13 +5,17 @@ import java.awt.*;
 import java.awt.event.*;
 
 /**
- * Mode de dessin de lignes
- * Patron State (GoF): État concret pour le dessin de lignes
- * Utilise OutilLigne (Strategy) pour créer les annotations
- * Principe GRASP: High Cohesion - responsabilité = interaction pour dessiner des lignes
- *
- * @author Antoine Mailhot & Micaël Racine-Leblanc
- * @version 1.0
+ * Implémentation du mode de dessin de lignes (Annotations).
+ * <p>
+ * Ce mode capture les événements souris, convertit les coordonnées de l'écran (Vue)
+ * vers les coordonnées de l'image (Modèle) et délègue la création de la ligne à {@link OutilLigne}.
+ * </p>
+ * <h3>Responsabilités :</h3>
+ * <ul>
+ *   <li><b>Conversion de coordonnées</b> : Transforme les clics souris (affectés par le zoom/pan) en coordonnées réelles sur l'image.</li>
+ *   <li><b>Délégation</b> : Utilise {@link OutilLigne} pour gérer la logique métier de création de l'annotation.</li>
+ *   <li><b>Feedback visuel</b> : Déclenche le redessin de la vue pour afficher le trait en cours de construction.</li>
+ * </ul>
  */
 public class ModeLigne implements ModeInteraction {
 
@@ -20,8 +24,8 @@ public class ModeLigne implements ModeInteraction {
     private MouseMotionListener mouseMotionListener;
 
     /**
-     * Constructeur
-     * @param outil L'outil ligne à utiliser
+     * Constructeur du mode ligne.
+     * @param outil L'instance de l'outil qui contient la configuration (couleur, épaisseur) et la logique de création.
      */
     public ModeLigne(OutilLigne outil) {
         this.outil = outil;
@@ -32,13 +36,17 @@ public class ModeLigne implements ModeInteraction {
         mouseListener = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                // Conversion des coordonnées écran -> image
                 Point pointImage = convertirVersImage(e.getPoint(), panel, context);
+                
+                // Création d'un événement virtuel avec les coordonnées corrigées
                 MouseEvent eventConverti = new MouseEvent(
                     panel, e.getID(), e.getWhen(), e.getModifiersEx(),
                     pointImage.x, pointImage.y, e.getClickCount(), e.isPopupTrigger()
                 );
+                
                 outil.mousePressed(eventConverti);
-                panel.repaint();
+                panel.repaint(); // Force le rafraîchissement pour voir le début du trait
                 rafraichirVueAnnotations(context);
             }
 
@@ -49,8 +57,11 @@ public class ModeLigne implements ModeInteraction {
                     panel, e.getID(), e.getWhen(), e.getModifiersEx(),
                     pointImage.x, pointImage.y, e.getClickCount(), e.isPopupTrigger()
                 );
+                
+                // Finalisation du trait
                 outil.mouseReleased(eventConverti);
 
+                // Ajout au modèle via une Commande si une annotation a été créée
                 if (outil.getAnnotationFinale() != null) {
                     CommandeAjouterAnnotation cmd = new CommandeAjouterAnnotation(
                         context.getGestionnaireAnnotations(),
@@ -72,8 +83,9 @@ public class ModeLigne implements ModeInteraction {
                     panel, e.getID(), e.getWhen(), e.getModifiersEx(),
                     pointImage.x, pointImage.y, e.getClickCount(), e.isPopupTrigger()
                 );
+                
                 outil.mouseDragged(eventConverti);
-                panel.repaint();
+                panel.repaint(); // Important pour voir le trait suivre la souris
                 rafraichirVueAnnotations(context);
             }
         };

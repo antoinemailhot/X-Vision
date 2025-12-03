@@ -32,12 +32,13 @@ public class GestionnaireMemento {
 
     /**
      * Annule la dernière action (Undo) et bascule l’état vers Redo.
+     * @param etatCourant L'état actuel avant l'annulation (pour le Redo).
      * @return Le memento à restaurer, ou null s'il n’y a rien à annuler.
      */
-    public PerspectiveMemento undo() {
+    public PerspectiveMemento undo(PerspectiveMemento etatCourant) {
         if (!pileUndo.isEmpty()) {
             PerspectiveMemento m = pileUndo.pop();
-            pileRedo.push(m);
+            pileRedo.push(etatCourant);
             return m;
         }
         return null;
@@ -45,12 +46,13 @@ public class GestionnaireMemento {
 
     /**
      * Refait la dernière action annulée (Redo).
+     * @param etatCourant L'état actuel avant le rétablissement (pour l'Undo).
      * @return Le memento à restaurer, ou null s'il n’y a rien à refaire.
      */
-    public PerspectiveMemento redo() {
+    public PerspectiveMemento redo(PerspectiveMemento etatCourant) {
         if (!pileRedo.isEmpty()) {
             PerspectiveMemento m = pileRedo.pop();
-            pileUndo.push(m);
+            pileUndo.push(etatCourant);
             return m;
         }
         return null;
