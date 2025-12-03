@@ -59,6 +59,7 @@ public class MainGUI extends JFrame implements ObserverIF {
 
     private JToggleButton btnOutilLigne;
     private JToggleButton btnOutilCrop;
+    private ButtonGroup groupOutils;
 
     // --- Autosave ---
     private final String cheminAutosave = "perspectives/autosave.json";
@@ -103,6 +104,15 @@ public class MainGUI extends JFrame implements ObserverIF {
         if (vuePreview != null) contexte.setVueAnnotations(vuePreview);
 
         gestionnaireOutils = new GestionnaireOutils(panelNavigation, contexte);
+
+        // Callback pour désélectionner les outils quand le mode revient à Navigation (ex: fin du crop)
+        gestionnaireOutils.setOnModeChange(() -> {
+            if (gestionnaireOutils.getModeActuel() instanceof ModeNavigation) {
+                if (groupOutils != null) {
+                    groupOutils.clearSelection();
+                }
+            }
+        });
 
         if (vuePreview != null) {
             vuePreview.setGestionnaireOutils(gestionnaireOutils);
@@ -345,6 +355,9 @@ public class MainGUI extends JFrame implements ObserverIF {
                                     vuePreview.setPerspective(perspective);
                                     vuePreview.actualiser();
                                 }
+                                if (minimap != null) {
+                                    minimap.setPerspective(perspective);
+                                }
                                 actualiser();
                                 JOptionPane.showMessageDialog(MainGUI.this, "Chargement terminé !");
                             }
@@ -367,7 +380,7 @@ public class MainGUI extends JFrame implements ObserverIF {
         btnOutilCrop.setMaximumSize(new Dimension(150, 30));
         btnOutilLigne = new JToggleButton("Outil Ligne");
         btnOutilLigne.setMaximumSize(new Dimension(150, 30));
-        ButtonGroup groupOutils = new ButtonGroup();
+        groupOutils = new ButtonGroup();
         groupOutils.add(btnOutilCrop);
         groupOutils.add(btnOutilLigne);
 

@@ -26,6 +26,9 @@ public class GestionnaireOutils {
     private final ModeNavigation modeNavigation;
     private ModeLigne modeLigne;
     private ModeCrop modeCrop;
+    
+    // Listener pour notifier l'UI des changements de mode
+    private Runnable onModeChange;
 
     /**
      * Constructeur du gestionnaire d'outils.
@@ -72,6 +75,14 @@ public class GestionnaireOutils {
     }
 
     /**
+     * Définit un callback à exécuter lors d'un changement de mode.
+     * @param callback Runnable à exécuter.
+     */
+    public void setOnModeChange(Runnable callback) {
+        this.onModeChange = callback;
+    }
+
+    /**
      * Méthode interne pour effectuer la transition entre deux modes.
      * Désactive proprement l'ancien mode (nettoyage des listeners) avant d'activer le nouveau.
      * @param nouveauMode Le mode à activer.
@@ -84,6 +95,10 @@ public class GestionnaireOutils {
         modeActuel = nouveauMode;
         if (modeActuel != null) {
             modeActuel.activer(panel, contexte);
+        }
+        
+        if (onModeChange != null) {
+            onModeChange.run();
         }
     }
 
