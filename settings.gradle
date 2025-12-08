@@ -1,0 +1,6 @@
+/**
+ * Configuration Gradle Settings pour X-Vision
+ * Définit le nom du projet et les modules (si nécessaire)
+ */
+
+rootProject.name = 'xvision'

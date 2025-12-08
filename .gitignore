@@ -1,0 +1,74 @@
+# ==================== GRADLE ====================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Gradle Wrapper
+gradlew.bat
+
+# ==================== JAVA ====================
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# ==================== IDE ====================
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# NetBeans
+nbproject/
+nbbuild/
+dist/
+nbdist/
+
+# ==================== MAC OS ====================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ==================== TESTS ====================
+
+# Rapports de tests
+test-results/
+test-reports/
+
+# Fichiers temporaires de tests
+restored_*.png
+test_persistence.json
+**/test-output/
+
+# Couverture
+.jacoco/
+jacoco.exec
+
+# ==================== PROJET SPÉCIFIQUE ====================
+
+# Ancienne structure (à supprimer après migration complète)
+# src/xvision/
+
+# Images restaurées lors des tests de persistance
+restored_*.png
+
+# Fichiers JSON de test
+test_*.json
+
+# ==================== BUILD ARTIFACTS ====================
+*.zip

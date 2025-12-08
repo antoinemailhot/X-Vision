@@ -1,0 +1,298 @@
+/**
+ * Configuration Gradle pour le projet X-Vision
+ * TP2 INF1163 - Stratégie & mise en œuvre des tests
+ *
+ * Ce fichier configure:
+ * - Compilation Java 17+
+ * - Tests JUnit 5 avec Mockito
+ * - Couverture JaCoCo (cibles: Modèle ≥80%, Contrôleurs ≥70%)
+ * - Mutation testing PIT (optionnel)
+ * - Tests BDD avec Cucumber
+ *
+ * @author Antoine Mailhot & Micaël Racine-Leblanc
+ * @version 1.0
+ */
+
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'info.solidsoft.pitest' version '1.15.0'  // Mutation testing (optionnel)
+}
+
+group = 'ca.uqam.inf1163'
+version = '2.0-TP2'
+
+// Configuration Java
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+// Repositories pour les dépendances
+repositories {
+    mavenCentral()
+}
+
+// Versions des dépendances (facilite la maintenance)
+ext {
+    junitVersion = '5.10.1'
+    mockitoVersion = '5.8.0'
+    assertjVersion = '3.24.2'
+    cucumberVersion = '7.15.0'
+}
+
+dependencies {
+    // ==================== TESTS UNITAIRES ====================
+
+    // JUnit 5 (Jupiter) - Framework de tests moderne
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:${junitVersion}"  // Tests paramétrés
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+
+    // Mockito - Mocks et stubs pour isolation des tests
+    testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+    testImplementation "org.mockito:mockito-junit-jupiter:${mockitoVersion}"  // Intégration JUnit 5
+
+    // AssertJ - Assertions fluides (optionnel, améliore lisibilité)
+    testImplementation "org.assertj:assertj-core:${assertjVersion}"
+
+    // ==================== TESTS D'ACCEPTATION (BDD) ====================
+
+    // Cucumber - Framework BDD/Gherkin
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+
+    // ==================== PRODUCTION ====================
+
+    // Aucune dépendance externe pour le moment (Java Swing natif)
+}
+
+// ==================== CONFIGURATION DES TESTS ====================
+
+test {
+    useJUnitPlatform()  // Active JUnit 5
+
+    // Options JVM pour les tests
+    maxHeapSize = '1G'
+
+    // Affichage détaillé des résultats
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = false
+    }
+
+    // Fail fast: arrêter dès le premier échec (utile en dev)
+    // Commenter pour exécuter tous les tests même en cas d'échec
+    // failFast = true
+
+    // Filtres par tags JUnit (pour exécuter seulement certains types)
+    // Exemples: -Dtest.tags=unit, -Dtest.tags=integration
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'false'
+}
+
+// Tâche pour tests unitaires uniquement
+task testUnit(type: Test) {
+    description = 'Exécute uniquement les tests unitaires (70% de la pyramide)'
+    group = 'verification'
+
+    useJUnitPlatform {
+        includeTags 'unit'
+    }
+}
+
+// Tâche pour tests d'intégration uniquement
+task testIntegration(type: Test) {
+    description = 'Exécute uniquement les tests d\'intégration (20% de la pyramide)'
+    group = 'verification'
+
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+
+    // Les tests d'intégration dépendent de la compilation
+    shouldRunAfter testUnit
+}
+
+// Tâche pour tests E2E uniquement
+task testE2E(type: Test) {
+    description = 'Exécute uniquement les tests end-to-end (10% de la pyramide)'
+    group = 'verification'
+
+    useJUnitPlatform {
+        includeTags 'e2e'
+    }
+
+    // Les tests E2E sont les plus lents, les exécuter en dernier
+    shouldRunAfter testIntegration
+}
+
+// Tâche pour tests d'acceptation (Cucumber)
+task testAcceptance(type: Test) {
+    description = 'Exécute les tests d\'acceptation BDD/Gherkin'
+    group = 'verification'
+
+    useJUnitPlatform {
+        includeTags 'acceptance'
+    }
+}
+
+// ==================== CONFIGURATION JACOCO (COUVERTURE) ====================
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    dependsOn test
+
+    reports {
+        xml.required = true   // Pour CI/CD
+        html.required = true  // Pour visualisation locale
+        csv.required = false
+    }
+
+    // Exclusions (vues non testées par choix pragmatique)
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/view/**',           // Vues Swing (difficiles à tester unitairement)
+                '**/MainGUI.class',     // Point d'entrée GUI
+                '**/test/**'            // Classes de test
+            ])
+        }))
+    }
+}
+
+// Vérification des seuils de couverture (conformité TP2)
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+
+                // Modèle: ≥80% de couverture
+                minimum = 0.80
+            }
+            includes = ['xvision.model.*']
+        }
+
+        rule {
+            element = 'PACKAGE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+
+                // Contrôleurs: ≥70% de couverture
+                minimum = 0.70
+            }
+            includes = ['xvision.controller.*']
+        }
+    }
+}
+
+// Associer la vérification de couverture au build
+check.dependsOn jacocoTestCoverageVerification
+
+// ==================== CONFIGURATION PIT (MUTATION TESTING) ====================
+
+pitest {
+    targetClasses = ['xvision.model.*', 'xvision.controller.*']
+    targetTests = ['xvision.unit.*', 'xvision.integration.*']
+
+    // Exclusions
+    excludedClasses = ['xvision.view.*', 'xvision.MainGUI']
+
+    // Mutations à tester
+    mutators = ['DEFAULTS']
+
+    // Seuils (optionnel, pour fail le build si mutation coverage trop basse)
+    // coverageThreshold = 70
+    // mutationThreshold = 60
+
+    // Threads (accélère l'exécution)
+    threads = 4
+
+    // Output
+    outputFormats = ['HTML', 'XML']
+    timestampedReports = false
+}
+
+// ==================== TÂCHES PERSONNALISÉES ====================
+
+// Tâche: Pyramide de tests complète (unit → integration → e2e → acceptance)
+task testPyramid {
+    description = 'Exécute la pyramide complète de tests dans l\'ordre'
+    group = 'verification'
+
+    dependsOn testUnit, testIntegration, testE2E, testAcceptance
+
+    // Ordre d'exécution
+    testIntegration.mustRunAfter testUnit
+    testE2E.mustRunAfter testIntegration
+    testAcceptance.mustRunAfter testE2E
+}
+
+// Tâche: Rapport complet (tests + couverture + mutation)
+task rapportComplet {
+    description = 'Génère tous les rapports (tests, couverture, mutation)'
+    group = 'documentation'
+
+    dependsOn test, jacocoTestReport, pitest
+
+    doLast {
+        println "=========================================="
+        println "  RAPPORTS GÉNÉRÉS AVEC SUCCÈS"
+        println "=========================================="
+        println "📊 Résultats tests:  build/reports/tests/test/index.html"
+        println "📈 Couverture JaCoCo: build/reports/jacoco/test/html/index.html"
+        println "🧬 Mutation PIT:      build/reports/pitest/index.html"
+        println "=========================================="
+    }
+}
+
+// Tâche: Nettoyage complet (+ fichiers générés par les tests)
+task cleanAll {
+    description = 'Nettoyage complet du projet (build + fichiers temporaires)'
+    group = 'build'
+
+    dependsOn clean
+
+    doLast {
+        delete fileTree('.') {
+            include '**/*.class'
+            include '**/restored_*.png'  // Images restaurées lors des tests de persistance
+            include '**/*.json'          // Fichiers JSON de test
+        }
+        println "✅ Nettoyage complet terminé"
+    }
+}
+
+// ==================== CONFIGURATION DU WRAPPER GRADLE ====================
+
+wrapper {
+    gradleVersion = '8.5'
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+// ==================== MESSAGES D'AIDE ====================
+
+// Afficher les commandes utiles après le build
+gradle.buildFinished { buildResult ->
+    if (buildResult.failure == null) {
+        println ""
+        println "✅ Build réussi! Commandes utiles:"
+        println "   ./gradlew test              → Tous les tests"
+        println "   ./gradlew testUnit          → Tests unitaires uniquement"
+        println "   ./gradlew testIntegration   → Tests d'intégration uniquement"
+        println "   ./gradlew testPyramid       → Pyramide complète"
+        println "   ./gradlew jacocoTestReport  → Générer rapport de couverture"
+        println "   ./gradlew rapportComplet    → Tous les rapports"
+        println "   ./gradlew cleanAll          → Nettoyage complet"
+        println ""
+    }
+}
